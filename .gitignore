@@ -31,3 +31,4 @@ Thumbs.db
 # Optional: Ignore Tailwind/PostCSS Config if Unchanged
 tailwind.config.js
 postcss.config.js
+.vite/deps
