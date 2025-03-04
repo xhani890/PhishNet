@@ -32,3 +32,6 @@ Thumbs.db
 tailwind.config.js
 postcss.config.js
 .vite/deps
+README.md
+eslint.config.js
+vite.config.js
