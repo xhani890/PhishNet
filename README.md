@@ -19,4 +19,4 @@ Committee's Comments:
   - Keep it simulator based (not training)
 
   - Vague Problem Statement
-              - in Paragraph { Dr. Jawaiud } 
+              - in Paragraph { Dr. Jawaid } 
