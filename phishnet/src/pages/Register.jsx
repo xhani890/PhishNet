@@ -21,7 +21,7 @@ const Register = () => {
   return (
     <div className="relative flex items-center justify-center min-h-screen bg-black overflow-hidden">
       <div className="relative w-full max-w-md p-1 rounded-xl bg-[#131313] shadow-2xl">
-        <Card className="bg-[#1a1a1a] text-white border border-gray-800/50 shadow-lg rounded-xl backdrop-blur-sm">
+        <Card className="bg-[#1A1A1A] text-white border border-gray-800/50 shadow-lg rounded-xl backdrop-blur-sm">
           <CardHeader>
             <div className="flex flex-col items-center">
               <div className="w-20 h-20 rounded-full bg-blue-500/20 flex items-center justify-center mb-4 p-1">
