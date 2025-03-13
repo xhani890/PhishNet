@@ -1,7 +1,7 @@
 import React from "react";
 
 export function Card({ children, className }) {
-  return <div className={`bg-white shadow-md rounded-lg p-6 ${className}`}>{children}</div>;
+  return <div className={`bg-grey shadow-md rounded-lg p-6 ${className}`}>{children}</div>;
 }
 
 export function CardHeader({ children }) {

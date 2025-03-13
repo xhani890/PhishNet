@@ -43,8 +43,8 @@ const Login = ({ setIsAuthenticated }) => {
         <Card className="bg-[#1A1A1A] text-white border border-gray-800/50 shadow-lg rounded-xl backdrop-blur-sm">
           <CardHeader>
             <div className="flex flex-col items-center">
-              <div className="w-20 h-20 rounded-full bg-blue-500/20 flex items-center justify-center mb-4 p-1">
-                <img src={logo} alt="Logo" className="w-full h-full rounded-full object-cover border-2 border-blue-500/30 shadow-lg" />
+              <div className="w-20 h-20 rounded-full bg-orange-500/20 flex items-center justify-center mb-4 p-1">
+                <img src={logo} alt="Logo" className="w-full h-full rounded-full object-cover border-2 border-orange-500/30 shadow-lg" />
               </div>
               <CardTitle className="text-center text-2xl mt-2 text-white">Welcome Back</CardTitle>
             </div>
@@ -56,22 +56,22 @@ const Login = ({ setIsAuthenticated }) => {
                 <label className="text-gray-300 text-sm block mb-2">Email Address</label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500" />
-                  <Input type="email" placeholder="Enter your email" className="pl-10 bg-[#1a1a1a] text-white border-gray-700/50 focus:ring-2 focus:ring-blue-500/50 transition-all duration-300" value={email} onChange={(e) => setEmail(e.target.value)} required />
+                  <Input type="email" placeholder="Enter your email" className="pl-10 bg-[#1a1a1a] text-white border-gray-700/50 focus:ring-2 focus:ring-orange-500/50 transition-all duration-300" value={email} onChange={(e) => setEmail(e.target.value)} required />
                 </div>
               </div>
               <div>
                 <label className="text-gray-300 text-sm block mb-2">Password</label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500" />
-                  <Input type="password" placeholder="Enter your password" className="pl-10 bg-[#1a1a1a] text-white border-gray-700/50 focus:ring-2 focus:ring-blue-500/50 transition-all duration-300" value={password} onChange={(e) => setPassword(e.target.value)} required />
+                  <Input type="password" placeholder="Enter your password" className="pl-10 bg-[#1a1a1a] text-white border-gray-700/50 focus:ring-2 focus:ring-orange-500/50 transition-all duration-300" value={password} onChange={(e) => setPassword(e.target.value)} required />
                 </div>
               </div>
-              <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 transition-all duration-300 text-white font-semibold py-3 rounded-lg shadow-lg hover:shadow-blue-500/50">
+              <Button type="submit" className="w-full bg-orange-600 hover:bg-orange-700 transition-all duration-300 text-white font-semibold py-3 rounded-lg shadow-lg hover:shadow-orange-500/50">
                 Login
               </Button>
             </form>
             <p className="text-center text-gray-400 mt-4 text-sm">
-              Don't have an account? <span className="text-blue-500 hover:underline cursor-pointer" onClick={() => navigate("/register")}>Register</span>
+              Don't have an account? <span className="text-orange-500 hover:underline cursor-pointer" onClick={() => navigate("/register")}>Register</span>
             </p>
           </CardContent>
         </Card>

@@ -5,7 +5,7 @@ export function Input({ type = "text", placeholder, className, ...props }) {
     <input
       type={type}
       placeholder={placeholder}
-      className={`border p-2 rounded w-full focus:outline-none focus:ring-2 focus:ring-blue-500 ${className}`}
+      className={`border p-2 rounded w-full focus:outline-none focus:ring-2 focus:ring-orange-500 ${className}`}
       {...props}
     />
   );
