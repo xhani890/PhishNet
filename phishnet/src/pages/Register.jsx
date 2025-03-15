@@ -1,8 +1,8 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Input } from "../component/ui/input";
-import { Button } from "../component/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "../component/ui/card";
+import { Input } from "../components/ui/input";
+import { Button } from "../components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import logo from "../assets/img/Logo/logo.jpg";
 
 const Register = () => {
