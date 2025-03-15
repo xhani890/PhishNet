@@ -5,11 +5,12 @@ import Header from "./components/dashboard/Header";
 import Dashboard from "./pages/Dashboard";
 import Footer from "./components/dashboard/Footer";
 import Login from "./pages/Login"; 
-import Register from "./pages/Register"; // Import Register page
+import Register from "./pages/Register"; 
+import ForgotPassword from "./pages/ForgotPassword"; // ✅ Ensure correct import
 import "./index.css";
 
 function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false); // Track login status
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   return (
     <Router>
@@ -17,6 +18,7 @@ function App() {
         {/* Public Routes */}
         <Route path="/login" element={<Login setIsAuthenticated={setIsAuthenticated} />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} /> {/* ✅ Ensure this exists */}
 
         {/* Protected Routes - Redirect if not authenticated */}
         <Route

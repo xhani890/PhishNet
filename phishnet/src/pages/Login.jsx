@@ -108,6 +108,13 @@ const Login = ({ setIsAuthenticated }) => {
               </Button>
             </form>
 
+            {/* Forgot Password Link */}
+            <p className="text-center text-gray-400 mt-4 text-sm">
+              <span className="text-orange-500 hover:underline cursor-pointer" onClick={() => navigate("/forgot-password")}>
+                Forgot Password?
+              </span>
+            </p>
+
             <p className="text-center text-gray-400 mt-4 text-sm">
               Don&apos;t have an account?{" "}
               <span className="text-orange-500 hover:underline cursor-pointer" onClick={() => navigate("/register")}>
