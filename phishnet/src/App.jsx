@@ -1,9 +1,9 @@
 import React, { useState } from "react";
 import { BrowserRouter as Router, Route, Routes, Navigate } from "react-router-dom";
-import Sidebar from "./component/dashboard/Sidebar";
-import Header from "./component/dashboard/Header";
+import Sidebar from "./components/dashboard/Sidebar";
+import Header from "./components/dashboard/Header";
 import Dashboard from "./pages/Dashboard";
-import Footer from "./component/dashboard/Footer";
+import Footer from "./components/dashboard/Footer";
 import Login from "./pages/Login"; 
 import Register from "./pages/Register"; // Import Register page
 import "./index.css";
