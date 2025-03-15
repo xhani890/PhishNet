@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import { Input } from "../component/ui/input";
 import { Button } from "../component/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../component/ui/card";
-import { Lock, Mail, User } from "lucide-react";
 import logo from "../assets/img/Logo/logo.jpg";
 
 const Register = () => {

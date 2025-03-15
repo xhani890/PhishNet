@@ -241,7 +241,7 @@ const Dashboard = () => {
                 <AdminIcon />
               </div>
               <span className="text-gray-700 font-bold">| Administration Dashboard</span>
-              <span className="text-gray-500 text-sm ml-2">- Welcome to your Administration Dashboard! Below is a snapshot of your organisation's resources</span>
+              <span className="text-gray-500 text-sm ml-2">- Welcome to your Administration Dashboard! Below is a snapshot of your organisation&apos;s resources</span>
             </div>
             <div className="flex items-center">
               <span className="text-xs text-blue-600 mr-2">Support Documentation</span>
@@ -313,7 +313,7 @@ const Dashboard = () => {
       {/* Cookie Banner */}
       <div className="bg-gray-900 text-white p-3 flex justify-between items-center">
         <div>
-          <span className="text-sm">PhishNet uses cookies. By continuing you agree to PhishNet's use of cookies</span>
+          <span className="text-sm">PhishNet uses cookies. By continuing you agree to PhishNet use of cookies</span>
           <span className="text-sm text-gray-400 ml-2 underline">Learn more</span>
         </div>
         <div className="flex">

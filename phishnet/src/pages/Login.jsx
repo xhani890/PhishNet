@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import PropTypes from "prop-types";
 import { useNavigate } from "react-router-dom";
 import { Input } from "../component/ui/input";
 import { Button } from "../component/ui/button";
@@ -71,13 +72,18 @@ const Login = ({ setIsAuthenticated }) => {
               </Button>
             </form>
             <p className="text-center text-gray-400 mt-4 text-sm">
-              Don't have an account? <span className="text-orange-500 hover:underline cursor-pointer" onClick={() => navigate("/register")}>Register</span>
+              Don&apos;t have an account? <span className="text-orange-500 hover:underline cursor-pointer" onClick={() => navigate("/register")}>Register</span>
             </p>
           </CardContent>
         </Card>
       </div>
     </div>
   );
+};
+
+// ✅ Fix missing prop validation
+Login.propTypes = {
+  setIsAuthenticated: PropTypes.func.isRequired,
 };
 
 export default Login;

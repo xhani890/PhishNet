@@ -1,4 +1,5 @@
 import React from "react";
+import PropTypes from "prop-types";
 
 export function Button({ children, className, ...props }) {
   return (
@@ -10,3 +11,9 @@ export function Button({ children, className, ...props }) {
     </button>
   );
 }
+
+// ✅ Add PropTypes
+Button.propTypes = {
+  children: PropTypes.node.isRequired,
+  className: PropTypes.string,
+};

@@ -1,4 +1,5 @@
 import React from "react";
+import PropTypes from "prop-types";
 
 export function Input({ type = "text", placeholder, className, ...props }) {
   return (
@@ -10,3 +11,11 @@ export function Input({ type = "text", placeholder, className, ...props }) {
     />
   );
 }
+
+// ✅ Add PropTypes
+Input.propTypes = {
+  type: PropTypes.string,
+  placeholder: PropTypes.string,
+  className: PropTypes.string,
+};
+
