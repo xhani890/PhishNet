@@ -1,25 +1,25 @@
-import express from "express";  // ✅ Use `import` instead of `require`
-import dotenv from "dotenv";     // ✅ For environment variables
-import cors from "cors";         // ✅ Allow frontend to access backend
-import authRoutes from "./routes/authRoutes.js"; // ✅ Ensure `.js` extension
-import mongoose from "mongoose"; // ✅ If using MongoDB
+import express from "express";
+import cors from "cors";
+import { config } from "dotenv";
+import sequelize from "./config/database.js";
+import authRoutes from "./routes/authRoutes.js"; // ✅ Update path
 
-dotenv.config(); // Load environment variables
+config();
 
 const app = express();
 app.use(express.json());
-app.use(cors()); // Allow frontend requests
+app.use(cors());
 
-// ✅ Setup API Routes
+// Routes
 app.use("/api/auth", authRoutes);
 
-// ✅ Connect to MongoDB (if applicable)
-mongoose.connect(process.env.MONGO_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-}).then(() => console.log("✅ MongoDB Connected"))
-  .catch(err => console.error("❌ MongoDB Connection Error:", err));
+// Sync database
+sequelize.sync().then(() => {
+  console.log("📦 Database connected!");
+});
 
-// ✅ Start the server
+// Start server
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+app.listen(PORT, () => {
+  console.log(`🚀 Server running on http://localhost:${PORT}`);
+});

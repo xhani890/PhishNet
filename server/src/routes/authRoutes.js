@@ -1,173 +1,173 @@
-import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { Input } from "../components/ui/input";
-import { Button } from "../components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
-import logo from "../assets/img/Logo/logo.jpg";
-import { CheckCircle, XCircle } from "lucide-react"; // ✅ Icons for password validation
-import authService from "../services/auth/authService";
-import { toast } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
+import express from "express";
+import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
+import crypto from "crypto";
+import dotenv from "dotenv";
+import User from "../models/User.js";
+import sendEmail from "../config/email.js";
+import { Sequelize } from "sequelize";
+import sequelize from "../config/database.js";
+import passwordResetTemplate from "../utils/passwordResetTemplate.js"; // ✅ Import Email Template
 
-const Register = () => {
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [passwordStrength, setPasswordStrength] = useState(""); // ✅ Password strength tracking
+dotenv.config();
 
-  const navigate = useNavigate();
+const router = express.Router();
 
-  // ✅ Check password strength in real-time
-  const validatePassword = (pwd) => {
-    const lengthValid = pwd.length >= 8;
-    const hasNumber = /\d/.test(pwd);
-    const hasUppercase = /[A-Z]/.test(pwd);
+// ✅ Forgot Password Route (Restored)
+router.post("/forgot-password", async (req, res) => {
+  try {
+    const { email } = req.body;
 
-    if (lengthValid && hasNumber && hasUppercase) {
-      setPasswordStrength("strong");
-    } else if (lengthValid) {
-      setPasswordStrength("weak");
-    } else {
-      setPasswordStrength("invalid");
-    }
-  };
-
-  const handleRegister = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setError(null);
-
-    if (passwordStrength !== "strong") {
-      setError("Your password is too weak. Please use at least 8 characters, a number & an uppercase letter.");
-      setLoading(false);
-      return;
+    // 🔍 Find user by email
+    const user = await User.findOne({ where: { email } });
+    if (!user) {
+      return res.status(404).json({ message: "No account found with that email!" });
     }
 
-    if (password !== confirmPassword) {
-      setError("Passwords do not match. Please try again.");
-      setLoading(false);
-      return;
+    // 🔑 Generate Secure Reset Token
+    const token = crypto.randomBytes(32).toString("hex");
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // Token expires in 15 minutes
+
+    // 💾 Store Reset Token in Database
+    await sequelize.query(
+      "INSERT INTO password_reset_tokens (user_id, token, expires_at) VALUES (:user_id, :token, :expiresAt)",
+      {
+        replacements: { user_id: user.id, token, expiresAt },
+        type: Sequelize.QueryTypes.INSERT,
+      }
+    );
+
+    // ✉️ Send Password Reset Email with User’s Name
+    const resetLink = `http://localhost:5173/reset-password?token=${token}`; // ✅ Fix: Use correct frontend port
+    const emailHtml = passwordResetTemplate(user.name, resetLink);
+
+    await sendEmail(user.email, "🔑 Password Reset Request", emailHtml);
+
+    res.json({ message: "📧 Password reset email sent!" });
+  } catch (error) {
+    console.error("❌ Forgot Password Error:", error);
+    res.status(500).json({ message: "Server error!" });
+  }
+});
+
+// ✅ Login Route
+router.post("/login", async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    // Find user in DB
+    const user = await User.findOne({ where: { email } });
+    if (!user) {
+      return res.status(401).json({ message: "Invalid email or password!" });
     }
 
-    try {
-      await authService.register(name, email, password);
-      toast.success("🎉 Account created! Redirecting...");
-      setTimeout(() => navigate("/login"), 2000);
-    } catch (err) {
-      setError(err.response?.data?.message || "Registration failed");
-      toast.error("⚠️ Registration failed. Please try again.");
-    } finally {
-      setLoading(false);
+    // Compare passwords
+    const isMatch = await bcrypt.compare(password, user.password_hash);
+    if (!isMatch) {
+      return res.status(401).json({ message: "Invalid email or password!" });
     }
-  };
 
-  return (
-    <div className="relative flex items-center justify-center min-h-screen bg-black overflow-hidden">
-      <div className="relative w-full max-w-md p-1 rounded-xl bg-[#131313] shadow-2xl">
-        <Card className="bg-[#1A1A1A] text-white border border-gray-800/50 shadow-lg rounded-xl backdrop-blur-sm">
-          <CardHeader>
-            <div className="flex flex-col items-center">
-              <div className="w-20 h-20 rounded-full bg-orange-500/20 flex items-center justify-center mb-4 p-1">
-                <img src={logo} alt="Logo" className="w-full h-full rounded-full object-cover border-2 border-orange-500/30 shadow-lg" />
-              </div>
-              <CardTitle className="text-center text-2xl mt-2 text-white">Create Account</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleRegister} className="space-y-6">
-              {error && <p className="text-red-500 text-sm text-center">{error}</p>}
+    // Generate JWT token
+    const token = jwt.sign({ id: user.id, email: user.email }, process.env.JWT_SECRET, { expiresIn: "1h" });
 
-              <div>
-                <label className="text-gray-300 text-sm block mb-2">Full Name</label>
-                <Input
-                  type="text"
-                  placeholder="Enter your name"
-                  className="bg-[#1a1a1a] text-white border border-orange-500 focus:ring-2 focus:ring-orange-500 transition-all duration-300"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  required
-                />
-              </div>
+    res.status(200).json({ message: "Login successful!", token });
+  } catch (error) {
+    console.error("Login Error:", error);
+    res.status(500).json({ message: "Server error!" });
+  }
+});
 
-              <div>
-                <label className="text-gray-300 text-sm block mb-2">Email Address</label>
-                <Input
-                  type="email"
-                  placeholder="Enter your email"
-                  className="bg-[#1a1a1a] text-white border border-orange-500 focus:ring-2 focus:ring-orange-500 transition-all duration-300"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                />
-              </div>
 
-              <div>
-                <label className="text-gray-300 text-sm block mb-2">Password</label>
-                <div className="relative">
-                  <Input
-                    type="password"
-                    placeholder="Create a password"
-                    className="bg-[#1a1a1a] text-white border border-orange-500 focus:ring-2 focus:ring-orange-500 transition-all duration-300"
-                    value={password}
-                    onChange={(e) => {
-                      setPassword(e.target.value);
-                      validatePassword(e.target.value);
-                    }}
-                    required
-                  />
-                  {/* ✅ Live Password Strength Indicator */}
-                  {password && (
-                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                      {passwordStrength === "strong" ? (
-                        <CheckCircle className="text-green-500" />
-                      ) : (
-                        <XCircle className="text-red-500" />
-                      )}
-                    </div>
-                  )}
-                </div>
-                {/* ✅ Password Complexity Message */}
-                <p className={`text-xs mt-1 ${passwordStrength === "strong" ? "text-green-400" : "text-red-400"}`}>
-                  {passwordStrength === "strong"
-                    ? "✔ Secure password!"
-                    : "⚠ Use at least 8 characters, a number & an uppercase letter."}
-                </p>
-              </div>
 
-              <div>
-                <label className="text-gray-300 text-sm block mb-2">Confirm Password</label>
-                <Input
-                  type="password"
-                  placeholder="Re-enter password"
-                  className="bg-[#1a1a1a] text-white border border-orange-500 focus:ring-2 focus:ring-orange-500 transition-all duration-300"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  required
-                />
-              </div>
+// ✅ Reset Password Route (Prevents Reusing Old Password)
+router.post("/reset-password", async (req, res) => {
+  try {
+    const { token, newPassword } = req.body;
 
-              <Button
-                type="submit"
-                disabled={loading}
-                className="w-full bg-orange-600 hover:bg-orange-700 transition-all duration-300 text-white font-semibold py-3 rounded-lg shadow-lg hover:shadow-orange-500/50"
-              >
-                {loading ? "Creating Account..." : "Register"}
-              </Button>
-            </form>
-            <p className="text-center text-gray-400 mt-4 text-sm">
-              Already have an account?{" "}
-              <span className="text-orange-500 hover:underline cursor-pointer" onClick={() => navigate("/login")}>
-                Login
-              </span>
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
-  );
-};
+    // 🔍 Find Token in Database
+    const tokenData = await sequelize.query(
+      "SELECT * FROM password_reset_tokens WHERE token = :token AND expires_at > NOW()",
+      {
+        replacements: { token },
+        type: Sequelize.QueryTypes.SELECT,
+      }
+    );
 
-export default Register;
+    if (!tokenData.length) {
+      return res.status(400).json({ message: "❌ Invalid or expired token!" });
+    }
+
+    const userId = tokenData[0].user_id;
+
+    // 🔍 Fetch User's Current Hashed Password
+    const user = await sequelize.query(
+      "SELECT password_hash FROM users WHERE id = :userId",
+      {
+        replacements: { userId },
+        type: Sequelize.QueryTypes.SELECT,
+      }
+    );
+
+    if (!user.length) {
+      return res.status(400).json({ message: "❌ User not found!" });
+    }
+
+    const currentHashedPassword = user[0].password_hash;
+
+    // 🔄 Compare New Password with Old One
+    const isSamePassword = await bcrypt.compare(newPassword, currentHashedPassword);
+    if (isSamePassword) {
+      return res.status(400).json({ message: "⚠ You cannot use the same password as before!" });
+    }
+
+    // 🔑 Hash New Password
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    // 🔄 Update User Password
+    await sequelize.query(
+      "UPDATE users SET password_hash = :hashedPassword WHERE id = :userId",
+      {
+        replacements: { hashedPassword, userId },
+        type: Sequelize.QueryTypes.UPDATE,
+      }
+    );
+
+    // 🗑️ Delete Used Token (Invalidate it)
+    await sequelize.query(
+      "DELETE FROM password_reset_tokens WHERE token = :token",
+      {
+        replacements: { token },
+        type: Sequelize.QueryTypes.DELETE,
+      }
+    );
+
+    res.json({ message: "✅ Password reset successful! This link can no longer be used." });
+  } catch (error) {
+    console.error("❌ Reset Password Error:", error);
+    res.status(500).json({ message: "Server error!" });
+  }
+});
+
+// ✅ Validate Token Before Reset Page Loads
+router.post("/validate-token", async (req, res) => {
+  try {
+    const { token } = req.body;
+    const tokenData = await sequelize.query(
+      "SELECT * FROM password_reset_tokens WHERE token = :token AND expires_at > NOW()",
+      {
+        replacements: { token },
+        type: Sequelize.QueryTypes.SELECT,
+      }
+    );
+
+    if (!tokenData.length) {
+      return res.json({ valid: false });
+    }
+
+    res.json({ valid: true });
+  } catch (error) {
+    res.status(500).json({ valid: false, message: "Server error!" });
+  }
+});
+
+export default router;

@@ -22,20 +22,21 @@ const Login = ({ setIsAuthenticated }) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
-
+  
     try {
       const response = await authService.login(email, password); // 🔗 API Request
       localStorage.setItem("authToken", response.token); // 🔐 Store JWT
       setIsAuthenticated(true);
-      toast.success("Login successful! Redirecting..."); // 📢 Success Notification
+      toast.success("✅ Login successful! Redirecting..."); // 📢 Success Notification
+  
       setTimeout(() => navigate("/dashboard"), 1500);
     } catch (err) {
-      setError(err.response?.data?.message || "Invalid credentials");
-      toast.error("Login failed! Please check credentials."); // 📢 Error Notification
+      setError(err.response?.data?.message || "⚠️ Invalid credentials");
+      toast.error("❌ Login failed! Please check credentials."); // 📢 Error Notification
     } finally {
       setLoading(false);
     }
-  };
+  };  
 
   return (
     <div className="relative flex items-center justify-center min-h-screen bg-black overflow-hidden">

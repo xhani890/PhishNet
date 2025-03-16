@@ -94,9 +94,6 @@ const ForgotPassword = () => {
             <p className="text-gray-400 text-sm mt-2">
               If this email exists, a reset link has been sent. <br /> Check your inbox (or spam folder).
             </p>
-            <Button className="mt-4 bg-orange-500 w-full" onClick={() => setShowPopup(false)}>
-              Got it!
-            </Button>
           </div>
         </div>
       )}
