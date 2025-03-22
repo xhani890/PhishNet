@@ -5,6 +5,7 @@
   text-align: center;
 }
 
+/* 🔹 Logo Styles */
 .logo {
   height: 6em;
   padding: 1.5em;
@@ -18,6 +19,7 @@
   filter: drop-shadow(0 0 2em #61dafbaa);
 }
 
+/* 🔹 Logo Spin Animation */
 @keyframes logo-spin {
   from {
     transform: rotate(0deg);
@@ -27,16 +29,137 @@
   }
 }
 
+/* 🔹 Apply Animation only if motion preference allows */
 @media (prefers-reduced-motion: no-preference) {
   a:nth-of-type(2) .logo {
     animation: logo-spin infinite 20s linear;
   }
 }
 
+/* 🔹 Card Styling */
 .card {
   padding: 2em;
 }
 
+/* 🔹 Read the Docs Text */
 .read-the-docs {
   color: #888;
+}
+
+/* ✅ THEME STYLES (DARK & LIGHT MODE) */
+
+/* ✅ Default (Dark Mode) */
+body {
+  background-color: #131313;
+  color: white;
+  transition: background 0.3s ease, color 0.3s ease;
+}
+
+/* ✅ Light Mode */
+body.light-mode {
+  background-color: white;
+  color: black;
+}
+
+/* 🔹 Sidebar */
+.sidebar {
+  background-color: #1A1A1A;
+  width: 250px;
+  transition: background 0.3s ease, width 0.3s ease;
+}
+.light-mode .sidebar {
+  background-color: #F0F0F0;
+}
+
+/* 🔹 Sidebar Items */
+.sidebar-item {
+  padding: 10px;
+  color: white;
+  transition: background 0.3s ease, color 0.3s ease;
+}
+.light-mode .sidebar-item {
+  color: black;
+}
+.sidebar-item:hover {
+  background-color: rgba(255, 107, 0, 0.2);
+}
+.light-mode .sidebar-item:hover {
+  background-color: rgba(255, 107, 0, 0.1);
+}
+
+/* 🔹 Collapsed Sidebar */
+.sidebar.collapsed {
+  width: 60px;
+}
+.sidebar.collapsed .sidebar-item span {
+  display: none; /* Hide text labels */
+}
+
+/* 🔹 Hide Logo when Sidebar Collapses */
+.sidebar.collapsed .logo {
+  display: none;
+}
+
+/* ✅ Header */
+.header {
+  background-color: #1A1A1A;
+  padding: 15px;
+  transition: background 0.3s ease;
+}
+.light-mode .header {
+  background-color: #f8f8f8;
+  color: black;
+}
+
+/* ✅ Footer */
+.footer {
+  background-color: #1A1A1A;
+  padding: 10px;
+  transition: background 0.3s ease;
+}
+.light-mode .footer {
+  background-color: #f8f8f8;
+  color: black;
+}
+
+/* 🔹 Dropdown */
+.dropdown {
+  background-color: #1A1A1A;
+  border: 1px solid gray;
+  transition: background 0.3s ease;
+}
+.light-mode .dropdown {
+  background-color: white;
+  border-color: #ccc;
+}
+
+/* 🔹 Dropdown Items */
+.dropdown-item {
+  color: white;
+  transition: background 0.3s ease, color 0.3s ease;
+}
+.light-mode .dropdown-item {
+  color: black;
+}
+.dropdown-item:hover {
+  background-color: rgba(255, 107, 0, 0.2);
+}
+.light-mode .dropdown-item:hover {
+  background-color: rgba(255, 107, 0, 0.1);
+}
+
+/* ✅ THEME VARIABLE SUPPORT */
+:root {
+  --bg-color: #131313;
+  --text-color: white;
+  --sidebar-bg: #1A1A1A;
+  --hover-bg: #333;
+}
+
+/* ✅ Light Mode Variables */
+.light-mode {
+  --bg-color: white;
+  --text-color: black;
+  --sidebar-bg: #F0F0F0;
+  --hover-bg: #d6d6d6;
 }
