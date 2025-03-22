@@ -1,17 +1,59 @@
+/* Move @import to top */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+
+/* Base styles */
 #root {
   max-width: 1280px;
   margin: 0 auto;
   padding: 2rem;
   text-align: center;
+  font-family: 'Inter', sans-serif;
+  --hover-dark: rgba(255, 107, 0, 0.3);  /* Dark mode hover */
+  --hover-light: rgba(255, 107, 0, 0.1); /* Light mode hover */
 }
 
-/* 🔹 Logo Styles */
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
+/* Header text transitions */
+.header-text {
+  transition: all 0.3s ease;
+  font-family: inherit;
 }
+
+/* Improved dropdown hover states */
+.dropdown-item:hover {
+  background-color: var(--hover-dark);
+}
+.light-mode .dropdown-item:hover {
+  background-color: var(--hover-light);
+}
+
+.dark-mode .dropdown-item:hover {
+  background-color: rgba(255, 107, 0, 0.15); /* Better dark mode contrast */
+}
+
+/* Header text visibility */
+.header span {
+  transition: 
+    font-size 0.3s ease,
+    opacity 0.3s ease,
+    margin-left 0.3s ease;
+}
+
+/* Collapsed state adjustments */
+.sidebar.collapsed .sidebar-item span {
+  transform: translateX(-10px); /* Smoother collapse animation */
+}
+
+/* Font consistency */
+.header, .dropdown, .sidebar-item {
+  font-family: 'Inter', sans-serif;
+}
+
+/* Better logo transition */
+.logo {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Keep existing other styles... */
 .logo:hover {
   filter: drop-shadow(0 0 2em #646cffaa);
 }
@@ -53,6 +95,7 @@ body {
   background-color: #131313;
   color: white;
   transition: background 0.3s ease, color 0.3s ease;
+  font-family: 'Inter', sans-serif; /* Added font consistency */
 }
 
 /* ✅ Light Mode */
@@ -68,7 +111,7 @@ body.light-mode {
   transition: background 0.3s ease, width 0.3s ease;
 }
 .light-mode .sidebar {
-  background-color: #F0F0F0;
+  background-color: rgb(240, 240, 240);
 }
 
 /* 🔹 Sidebar Items */
@@ -92,7 +135,31 @@ body.light-mode {
   width: 60px;
 }
 .sidebar.collapsed .sidebar-item span {
-  display: none; /* Hide text labels */
+  display: inline-block; /* Changed from none */
+  opacity: 0;
+  transform: translateX(-20px);
+  pointer-events: none;
+}
+
+/* 🔹 Sidebar Text Animation */
+.sidebar-item span {
+  display: inline-block;
+  transition: all 0.3s ease;
+}
+
+.sidebar:not(.collapsed) .sidebar-item span {
+  animation: slideIn 0.3s ease forwards;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
 /* 🔹 Hide Logo when Sidebar Collapses */

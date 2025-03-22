@@ -1,13 +1,25 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Menu, Sun, Moon, User, LogOut, Settings } from "lucide-react";
+import PropTypes from "prop-types";
+import { Menu, Sun, Moon, User, LogOut, Settings, ChevronDown } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { jwtDecode } from "jwt-decode";
 
-const Header = ({ isCollapsed, setIsCollapsed, theme, setTheme }) => {
+const HeaderComponent = ({ isCollapsed, setIsCollapsed, theme, setTheme }) => {
   const [showDropdown, setShowDropdown] = useState(false);
   const navigate = useNavigate();
   const dropdownRef = useRef(null);
+  
+  const getEmailFromToken = () => {
+    try {
+      const token = localStorage.getItem("authToken");
+      if (!token) return "admin@example.com";
+      const decoded = jwtDecode(token);
+      return decoded.email || decoded.username || "admin@example.com";
+    } catch (error) {
+      return "admin@example.com";
+    }
+  };
 
-  // ✅ Handle Click Outside Dropdown
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -18,57 +30,86 @@ const Header = ({ isCollapsed, setIsCollapsed, theme, setTheme }) => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // ✅ Handle Logout
   const handleLogout = () => {
     localStorage.removeItem("authToken");
     navigate("/login");
   };
 
   return (
-    // Update the header's className to:
-<header className={`h-16 flex items-center justify-between shadow-md transition-all duration-300 fixed top-0 right-0 left-0 z-50 
-  ${theme === "dark" ? "bg-[#1A1A1A] text-white" : "bg-white text-black border-b"}`}>
+    <header className={`h-16 flex items-center justify-between transition-all duration-300 fixed top-0 right-0 left-0 z-50 
+      ${theme === "dark" ? "bg-[#1A1A1A] text-white" : "bg-white text-black border-b"}`}>
 
-      {/* 🔹 Left Section: Logo & Menu Button */}
-<div className="flex items-center space-x-3">
-  <button onClick={() => setIsCollapsed(!isCollapsed)} className="text-orange-500 hover:text-orange-600 ml-2">
-    <Menu size={24} />
-  </button>
-  <img src="/logo.jpg" alt="PhishNet Logo" className="w-12 h-12 mr-2" />
-        <span className="text-lg font-semibold">PhishNet</span>
+      {/* Left Section */}
+      <div className="flex items-center space-x-3">
+        <button onClick={() => setIsCollapsed(!isCollapsed)} className="text-orange-500 hover:text-orange-600 ml-2">
+          <Menu size={24} />
+        </button>
+        <img 
+          src="/logo.jpg" 
+          alt="PhishNet Logo" 
+          className={`transition-all duration-300 ${isCollapsed ? 'w-6 h-6' : 'w-8 h-8'}`}
+        />
+        <span className={`text-orange-500 transition-all duration-300 ${
+          isCollapsed ? 'text-sm opacity-50' : 'text-lg opacity-100'
+        } font-semibold truncate`}>
+          PhishNet
+        </span>
       </div>
-    
-      {/* 🔹 Right Section: Theme Toggle & User Profile */}
-      <div className="flex items-center space-x-4">
+
+      {/* Right Section */}
+      <div className="flex items-center space-x-4 pr-4">
         <button onClick={() => setTheme(theme === "dark" ? "light" : "dark")} className="text-orange-500 hover:text-orange-600">
           {theme === "dark" ? <Sun size={24} /> : <Moon size={24} />}
         </button>
-        
-        {/* 🔹 User Profile */}
+
         <div className="relative" ref={dropdownRef}>
-          <button onClick={() => setShowDropdown(!showDropdown)} className="flex items-center space-x-3">
-            <User size={24} className="text-orange-500" />
-            <span className="hidden sm:inline-block text-sm">{localStorage.getItem("userEmail") || "admin@example.com"}</span>
-          </button>
-    
-          {/* 🔹 Dropdown Menu */}
-          {showDropdown && (
-            <div className={`absolute right-0 mt-2 w-48 rounded-lg shadow-lg transition-all duration-300
-              ${theme === "dark" ? "bg-[#1A1A1A] border border-gray-700 text-white" : "bg-white border border-gray-300 text-black"}`}>
-              <ul>
-                <li className="p-3 hover:bg-gray-800 cursor-pointer flex items-center">
-                  <Settings size={16} className="mr-2" /> Settings
-                </li>
-                <li onClick={handleLogout} className="p-3 hover:bg-gray-800 cursor-pointer flex items-center">
-                  <LogOut size={16} className="mr-2" /> Logout
-                </li>
-              </ul>
+          <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-2">
+              <User size={20} className="text-orange-500" />
+              <span className="text-sm">{getEmailFromToken()}</span>
             </div>
-          )}
+            <button 
+              onClick={() => setShowDropdown(!showDropdown)}
+              className="text-orange-500 hover:text-orange-600 focus:outline-none"
+            >
+              <ChevronDown size={16} />
+            </button>
+          </div>
+
+          {showDropdown && (
+  <div className={`absolute right-0 mt-2 w-48 rounded-lg shadow-lg transition-all duration-300
+    ${theme === "dark" ? "bg-[#1A1A1A] border border-gray-700 text-white" : "bg-white border border-gray-300 text-black"}`}>
+    <ul>
+  <li className={`p-3 cursor-pointer flex items-center space-x-2 ${
+    theme === "dark" 
+      ? "hover:bg-gray-800"  // Match sidebar's dark hover
+      : "hover:bg-gray-200"  // Match sidebar's light hover
+  }`}>
+    <Settings size={16} className="text-orange-500" />
+    <span>Settings</span>
+  </li>
+  <li onClick={handleLogout} className={`p-3 cursor-pointer flex items-center space-x-2 ${
+    theme === "dark" 
+      ? "hover:bg-gray-800"  // Exact match
+      : "hover:bg-gray-200"  // Exact match
+  }`}>
+    <LogOut size={16} className="text-orange-500" />
+    <span>Logout</span>
+  </li>
+</ul>
+  </div>
+)}
         </div>
       </div>
-    </header>    
+    </header>
   );
 };
 
-export default Header;
+HeaderComponent.propTypes = {
+  isCollapsed: PropTypes.bool.isRequired,
+  setIsCollapsed: PropTypes.func.isRequired,
+  theme: PropTypes.string.isRequired,
+  setTheme: PropTypes.func.isRequired,
+};
+
+export default HeaderComponent;

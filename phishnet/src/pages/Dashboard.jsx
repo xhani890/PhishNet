@@ -1,4 +1,5 @@
 import React from "react";
+import PropTypes from "prop-types";
 import SummaryCards from "../components/Dashboard/SummaryCards";
 import { useSidebar } from "../context/SidebarContext";
 
@@ -16,6 +17,11 @@ const Dashboard = ({ theme }) => {
       <SummaryCards theme={theme} />
     </div>
   );
+};
+
+// ✅ Add PropTypes validation for Dashboard
+Dashboard.propTypes = {
+  theme: PropTypes.string.isRequired,
 };
 
 export default Dashboard;
