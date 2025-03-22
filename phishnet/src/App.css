@@ -81,7 +81,7 @@ body.light-mode {
   color: black;
 }
 .sidebar-item:hover {
-  background-color: rgba(255, 107, 0, 0.2);
+  background-color: rgba(255, 107, 0, 0.3);
 }
 .light-mode .sidebar-item:hover {
   background-color: rgba(255, 107, 0, 0.1);

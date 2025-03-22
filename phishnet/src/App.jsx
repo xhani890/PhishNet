@@ -19,9 +19,9 @@ function App() {
 
   // Sync theme with LocalStorage
   useEffect(() => {
-    document.body.className = theme;
+    document.body.className = theme; // ✅ Ensure class applies to entire body
     localStorage.setItem("theme", theme);
-  }, [theme]);
+  }, [theme]);  
 
   return (
     <SidebarProvider> {/* ✅ Wrap with SidebarProvider */}
@@ -41,8 +41,7 @@ function App() {
                 <div className={`flex h-screen transition-all duration-300 ${theme}`}>
                   {/* ✅ Sidebar Syncs Theme & Collapse State */}
                   <Sidebar isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} theme={theme} />
-
-                  <div className={`flex flex-col flex-1 transition-all duration-300 ${isCollapsed ? "ml-16" : "ml-64"}`}>
+                  <div className={`flex flex-col flex-1 transition-all duration-300 ${isCollapsed ? "ml-16" : "ml-64"} mt-16`}>
                     {/* ✅ Header Syncs Theme */}
                     <Header isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} theme={theme} setTheme={setTheme} />
 

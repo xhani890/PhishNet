@@ -25,15 +25,16 @@ const Header = ({ isCollapsed, setIsCollapsed, theme, setTheme }) => {
   };
 
   return (
-    <header className={`p-4 flex justify-between items-center shadow-md transition-all duration-300 
-      ${theme === "dark" ? "bg-[#1A1A1A] text-white" : "bg-white text-black border-b"}`}>
-      
-      {/* 🔹 Left Section: Sidebar Toggle + Logo + Text */}
-      <div className="flex items-center space-x-3">
-        <button onClick={() => setIsCollapsed(!isCollapsed)} className="text-orange-500 hover:text-orange-600">
-          <Menu size={24} />
-        </button>
-        <img src="/logo.jpg" alt="PhishNet Logo" className="w-12 h-12" />
+    // Update the header's className to:
+<header className={`h-16 flex items-center justify-between shadow-md transition-all duration-300 fixed top-0 right-0 left-0 z-50 
+  ${theme === "dark" ? "bg-[#1A1A1A] text-white" : "bg-white text-black border-b"}`}>
+
+      {/* 🔹 Left Section: Logo & Menu Button */}
+<div className="flex items-center space-x-3">
+  <button onClick={() => setIsCollapsed(!isCollapsed)} className="text-orange-500 hover:text-orange-600 ml-2">
+    <Menu size={24} />
+  </button>
+  <img src="/logo.jpg" alt="PhishNet Logo" className="w-12 h-12 mr-2" />
         <span className="text-lg font-semibold">PhishNet</span>
       </div>
     
