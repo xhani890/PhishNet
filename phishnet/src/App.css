@@ -1,16 +1,29 @@
 /* Move @import to top */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
 
-/* Base styles */
+/* Modified base styles */
 #root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
   font-family: 'Inter', sans-serif;
   --hover-dark: rgba(255, 107, 0, 0.3);  /* Dark mode hover */
   --hover-light: rgba(255, 107, 0, 0.1); /* Light mode hover */
 }
+
+/* New layout styles */
+main {
+  flex: 1;
+  overflow: auto;
+  height: calc(100vh - 4rem); /* Account for header height */
+}
+
+.mt-16 {
+  margin-top: 4rem; /* Matches header height */
+}
+
+/* Keep all existing styles below untouched */
 
 /* Header text transitions */
 .header-text {

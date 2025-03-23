@@ -4,9 +4,9 @@ import { LayoutDashboard, FileText, Users, Settings, Briefcase, Shield } from "l
 
 const Sidebar = ({ isCollapsed, theme }) => {
   return (
-    <div className={`fixed left-0 top-[64px] h-[calc(100vh-64px)] transition-all duration-300 
+    <div className={`fixed left-0 top-0 h-screen transition-all duration-300 
       ${isCollapsed ? "w-16" : "w-64"} 
-      ${theme === "dark" ? "bg-[#1A1A1A] text-white" : "bg-white text-black border-r border-gray-300"}`}>
+      ${theme === "dark" ? "bg-[#1A1A1A]" : "bg-white border-r"}`}>
 
       {/* Logo Section */}
       {!isCollapsed && (
@@ -16,13 +16,15 @@ const Sidebar = ({ isCollapsed, theme }) => {
             alt="PhishNet Logo" 
             className="w-8 h-8 mr-3 rounded-sm"
           />
-          <span className="text-xl font-bold text-orange-500">PhishNet</span>
+          <span className={`text-xl font-bold ${theme === "dark" ? "text-white" : "text-black"}`}>
+            PhishNet
+          </span>
         </div>
       )}
 
       {/* Navigation Items */}
       <nav className="mt-4">
-        <NavItem to="/dashboard" icon={LayoutDashboard} label="Dashboard" isCollapsed={isCollapsed} theme={theme} />
+        <NavItem to="/dashboard" icon={LayoutDashboard} label="Dashboard" isCollapsed={isCollapsed} theme={theme} end />
         <NavItem to="/dashboard/campaigns" icon={Shield} label="Phishing Campaigns" isCollapsed={isCollapsed} theme={theme} />
         <NavItem to="/dashboard/reports" icon={FileText} label="Reports" isCollapsed={isCollapsed} theme={theme} />
         <NavItem to="/dashboard/users" icon={Users} label="User Management" isCollapsed={isCollapsed} theme={theme} />
@@ -34,9 +36,10 @@ const Sidebar = ({ isCollapsed, theme }) => {
 };
 
 // Navigation Item Component
-const NavItem = ({ to, icon: Icon, label, isCollapsed, theme }) => (
+const NavItem = ({ to, icon: Icon, label, isCollapsed, theme, end = false }) => (
   <NavLink
     to={to}
+    end={end}
     className={({ isActive }) =>
       `flex items-center px-4 py-3 transition-all duration-300 ${
         isActive
@@ -47,7 +50,7 @@ const NavItem = ({ to, icon: Icon, label, isCollapsed, theme }) => (
       }`
     }
   >
-    <Icon size={20} className="text-orange-500" />
+    <Icon size={20} className={theme === "dark" ? "text-white" : "text-black"} />
     {!isCollapsed && (
       <span className="ml-4 sidebar-text" style={{ fontFamily: 'inherit' }}>
         {label}

@@ -36,8 +36,8 @@ const HeaderComponent = ({ isCollapsed, setIsCollapsed, theme, setTheme }) => {
   };
 
   return (
-    <header className={`h-16 flex items-center justify-between transition-all duration-300 fixed top-0 right-0 left-0 z-50 
-      ${theme === "dark" ? "bg-[#1A1A1A] text-white" : "bg-white text-black border-b"}`}>
+    <header className={`h-16 flex items-center justify-between fixed top-0 right-0 left-0 z-50 
+      ${theme === "dark" ? "bg-[#1A1A1A]" : "bg-white border-b"}`}>
 
       {/* Left Section */}
       <div className="flex items-center space-x-3">
@@ -47,9 +47,9 @@ const HeaderComponent = ({ isCollapsed, setIsCollapsed, theme, setTheme }) => {
         <img 
           src="/logo.jpg" 
           alt="PhishNet Logo" 
-          className={`transition-all duration-300 ${isCollapsed ? 'w-6 h-6' : 'w-8 h-8'}`}
+          className={`transition-all duration-0 ${isCollapsed ? 'w-6 h-6' : 'w-8 h-8'}`}
         />
-        <span className={`text-orange-500 transition-all duration-300 ${
+        <span className={`text-text-black transition-all duration-0 ${
           isCollapsed ? 'text-sm opacity-50' : 'text-lg opacity-100'
         } font-semibold truncate`}>
           PhishNet

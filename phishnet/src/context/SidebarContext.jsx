@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState } from "react";
+import PropTypes from "prop-types"; // Import PropTypes
 
 // ✅ Create Sidebar Context
 const SidebarContext = createContext(null);
@@ -11,6 +12,11 @@ export const SidebarProvider = ({ children }) => {
       {children}
     </SidebarContext.Provider>
   );
+};
+
+// ✅ Add PropTypes validation
+SidebarProvider.propTypes = {
+  children: PropTypes.node.isRequired,
 };
 
 // ✅ Custom Hook for Sidebar Context (Export Separately)
