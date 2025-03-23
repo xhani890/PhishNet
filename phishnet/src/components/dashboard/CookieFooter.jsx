@@ -1,7 +1,6 @@
 import React from 'react';
 import { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
-import { Link } from 'react-router-dom';
 import Cookies from 'js-cookie';
 
 const CookieFooter = ({ theme, isAuthenticated }) => {
