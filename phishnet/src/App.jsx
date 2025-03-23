@@ -15,6 +15,15 @@ import "./index.css";
 import { SidebarProvider } from "./context/SidebarContext";
 import { useInactivityTimer } from './hooks/useInactivityTimer';
 import LogoutModal from './components/dashboard/LogoutModal';
+import EmailTemplates from './pages/EmailTemplates';
+import { 
+  Eye, 
+  Pencil, 
+  Trash2,
+  Plus,
+  Rocket
+} from 'lucide-react';
+
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(() => !!localStorage.getItem("authToken"));
@@ -72,7 +81,7 @@ function App() {
   };
 
   // Protected layout component
-  const ProtectedLayout = () => (
+  const ProtectedLayout = ({ children }) => (
     <div className={`flex h-screen transition-all duration-300 ${theme}`}>
       <Sidebar isCollapsed={isCollapsed} theme={theme} />
       <div className="flex flex-col flex-1">
@@ -81,7 +90,7 @@ function App() {
           isCollapsed ? "ml-16" : "ml-64"
         } mt-16`}>
           <div className="p-6">
-            <Outlet />
+            <Outlet /> {/* This will render the nested routes */}
           </div>
         </main>
         <CookieFooter theme={theme} isAuthenticated={isAuthenticated} />
@@ -102,18 +111,20 @@ function App() {
 
           {/* Protected Dashboard Routes */}
           <Route path="/dashboard" element={
-            isAuthenticated ? (
-              <>
-                <ProtectedLayout />
-                <LogoutModal isOpen={showLogoutModal} onClose={() => <Navigate to="/login" replace />} />
-              </>
-            ) : (
-              <Navigate to="/login" replace />
-            )
-          }>
-            <Route index element={<Dashboard theme={theme} />} />
-            <Route path="campaigns" element={<h1>Campaigns Page</h1>} />
-          </Route>
+  isAuthenticated ? (
+    <ProtectedLayout>
+      <Outlet /> {/* This enables nested routing */}
+      <LogoutModal isOpen={showLogoutModal} onClose={() => <Navigate to="/login" replace />} />
+    </ProtectedLayout>
+  ) : (
+    <Navigate to="/login" replace />
+  )
+}>
+  <Route index element={<Dashboard theme={theme} />} />
+  <Route path="campaigns/templates" element={<EmailTemplates theme={theme} />} />
+  <Route path="campaigns/feedback" element={<h1>User Feedback Messages Page</h1>} />
+  <Route path="campaigns" element={<h1>Campaigns Page</h1>} />
+</Route>
 
           {/* Redirects */}
           <Route path="/" element={<Navigate to="/dashboard" replace />} />

@@ -41,3 +41,22 @@
     background: #888;
     border-radius: 4px;
   }
+ /* Enhanced dropdown animation */
+.submenu-transition {
+  transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Chevron rotation animation */
+.chevron-rotate {
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Hover effects */
+.sidebar-item-hover {
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+/* Active state highlight animation */
+.nav-item-active {
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
