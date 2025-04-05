@@ -1,0 +1,89 @@
+/* Base Editor Styles */
+.editor-container {
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  background: white;
+}
+
+/* Toolbar */
+.toolbar {
+  display: flex;
+  gap: 8px;
+  padding: 8px;
+  border-bottom: 1px solid #e0e0e0;
+  flex-wrap: wrap;
+  background: #f8f9fa;
+}
+
+.toolbar-section {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.toolbar-dropdown {
+  padding: 6px 12px;
+  border: 1px solid #d9d9d9;
+  border-radius: 4px;
+  background: white;
+}
+
+button {
+  padding: 6px 12px;
+  border: 1px solid #d9d9d9;
+  border-radius: 4px;
+  background: white;
+  cursor: pointer;
+}
+
+button.active {
+  background: #e0e0e0;
+}
+
+/* Dark Theme */
+.dark-editor .editor-container {
+  background: #1a1a1a;
+  border-color: #333;
+}
+
+.dark-toolbar {
+  background: #2d2d2d !important;
+  border-color: #444 !important;
+}
+
+.dark-toolbar .toolbar-dropdown,
+.dark-toolbar button {
+  background: #3d3d3d;
+  border-color: #555;
+  color: white;
+}
+
+.dark-toolbar button.active {
+  background: #4d4d4d;
+}
+
+.dark-editor .ProseMirror {
+  background: #1a1a1a;
+  color: white;
+  min-height: 400px;
+  padding: 16px;
+}
+
+/* Special Buttons */
+.token-button {
+  background: #4caf50 !important;
+  color: white !important;
+  border-color: #45a049 !important;
+}
+
+.image-button {
+  background: #2196f3 !important;
+  color: white !important;
+  border-color: #1976d2 !important;
+}
+
+.translate-button {
+  background: #9c27b0 !important;
+  color: white !important;
+  border-color: #7b1fa2 !important;
+}
