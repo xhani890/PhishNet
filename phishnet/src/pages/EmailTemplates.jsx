@@ -1,9 +1,11 @@
-import React from 'react';
-import { Shield, Plus, Rocket } from 'lucide-react';
-import { Eye, Pencil, Trash2, } from 'lucide-react';
+import React, { useState } from 'react';
+import { Shield, Plus, Rocket, Eye, Pencil, Trash2 } from 'lucide-react';
 import PropTypes from 'prop-types';
+import TemplateModal from '../components/phishing/TemplateModal';
 
 const EmailTemplates = ({ theme }) => {
+  const [isModalOpen, setModalOpen] = useState(false);
+
   const templates = [
     // Sample data - replace with real data
     { 
@@ -15,6 +17,10 @@ const EmailTemplates = ({ theme }) => {
     },
     // Add other template objects...
   ];
+
+  const handleCreateNewTemplate = () => {
+    setModalOpen(true);
+  };
 
   return (
     <div className={`p-6 ${theme === 'dark' ? 'text-white' : 'text-black'}`}>
@@ -33,11 +39,14 @@ const EmailTemplates = ({ theme }) => {
 
       {/* Action Buttons */}
       <div className="flex gap-4 mb-6">
-        <button className={`flex items-center gap-2 px-4 py-2 rounded-lg ${
-          theme === 'dark' 
-            ? 'bg-[#1A1A1A] hover:bg-gray-800 text-white' 
-            : 'bg-white hover:bg-gray-100 text-black border'
-        }`}>
+        <button 
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg ${
+            theme === 'dark' 
+              ? 'bg-[#1A1A1A] hover:bg-gray-800 text-white' 
+              : 'bg-white hover:bg-gray-100 text-black border'
+          }`}
+          onClick={handleCreateNewTemplate}
+        >
           <Plus size={18} />
           Create New Template
         </button>
@@ -94,9 +103,12 @@ const EmailTemplates = ({ theme }) => {
           </tbody>
         </table>
       </div>
+
+      <TemplateModal open={isModalOpen} onClose={() => setModalOpen(false)} theme={theme} />
     </div>
   );
 };
+
 EmailTemplates.propTypes = {
   theme: PropTypes.string.isRequired,
 };

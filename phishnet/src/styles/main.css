@@ -1,0 +1,31 @@
+/* Add this to your main CSS file */
+.dark-theme-editor {
+    background-color: #1A1A1A;
+    color: white;
+  }
+  
+  .light-theme-editor {
+    background-color: white;
+    color: black;
+  }
+  
+  /* Ensure the editor's content area also respects the theme */
+  .dark-theme-editor .se-container,
+  .dark-theme-editor .se-wrapper,
+  .dark-theme-editor .se-wrapper-inner,
+  .dark-theme-editor .se-content,
+  .dark-theme-editor .se-wrapper .se-toolbar,
+  .dark-theme-editor .se-wrapper .se-toolbar .se-btn-module {
+    background-color: #1A1A1A;
+    color: white;
+  }
+  
+  .light-theme-editor .se-container,
+  .light-theme-editor .se-wrapper,
+  .light-theme-editor .se-wrapper-inner,
+  .light-theme-editor .se-content,
+  .light-theme-editor .se-wrapper .se-toolbar,
+  .light-theme-editor .se-wrapper .se-toolbar .se-btn-module {
+    background-color: white;
+    color: black;
+  }

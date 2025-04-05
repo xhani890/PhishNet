@@ -1,96 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { Modal, Button, Form, Input, Select, notification } from 'antd';
-import { useEditor, EditorContent } from '@tiptap/react';
-import StarterKit from '@tiptap/starter-kit';
-import FontFamily from '@tiptap/extension-font-family';
-import TextAlign from '@tiptap/extension-text-align';
-import Image from '@tiptap/extension-image';
-import { Table, TableRow, TableCell, TableHeader } from '@tiptap/extension-table';
+import SunEditor from 'suneditor-react';
+import 'suneditor/dist/css/suneditor.min.css'; 
 
 const TemplateModal = ({ open, onClose, theme, refreshTemplates }) => {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
-  const [file, setFile] = useState(null);
-
-  const editor = useEditor({
-    extensions: [
-      StarterKit,
-      FontFamily.configure({ types: ['textStyle'] }),
-      TextAlign.configure({ types: ['heading', 'paragraph'] }),
-      Image,
-      Table.configure({
-        resizable: true,
-        HTMLAttributes: {
-          class: 'tiptap-table',
-        },
-      }),
-      TableRow.configure({
-        HTMLAttributes: {
-          class: 'table-row',
-        },
-      }),
-      TableHeader.configure({
-        HTMLAttributes: {
-          class: 'table-header',
-        },
-      }),
-      TableCell.configure({
-        HTMLAttributes: {
-          class: 'table-cell',
-        },
-      }),
-    ],
-    content: '',
-    editorProps: {
-      attributes: {
-        class: theme === 'dark' ? 'dark-editor' : 'light-editor',
-      },
-    },
-  });
-
-  const handleImageUpload = () => {
-    const input = document.createElement('input');
-    input.setAttribute('type', 'file');
-    input.setAttribute('accept', 'image/*');
-    input.click();
-    
-    input.onchange = async () => {
-      const file = input.files[0];
-      if (file && editor) {
-        setFile(file);
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          editor.chain().focus().setImage({ src: e.target.result }).run();
-        };
-        reader.readAsDataURL(file);
-      }
-    };
-  };
-
-  // Add token insertion
-  const insertToken = () => {
-    editor.chain().focus().insertContent('[CYBERRISKAWARE_TOKEN]').run();
-  };
-  const handleTranslate = () => {
-    notification.info({
-      message: 'Translation Service',
-      description: 'Translation feature coming soon!',
-    });
-  };
+  const [content, setContent] = useState('');
 
   const handleSave = async () => {
     try {
       setLoading(true);
       const values = await form.validateFields();
-      
+
       const formData = new FormData();
       formData.append('name', values.name);
       formData.append('type', values.type);
-      formData.append('content', editor?.getHTML() || '');
+      formData.append('content', content);
       formData.append('subject', values.subject);
       formData.append('description', values.description);
       formData.append('complexity', values.complexity);
-      if (file) formData.append('image', file);
 
       const response = await fetch('http://localhost:5000/api/templates', {
         method: 'POST',
@@ -98,12 +27,12 @@ const TemplateModal = ({ open, onClose, theme, refreshTemplates }) => {
       });
 
       if (!response.ok) throw new Error('Failed to save template');
-      
+
       notification.success({
         message: 'Template Saved',
         description: 'Template has been saved successfully!'
       });
-      
+
       refreshTemplates?.();
       onClose();
     } catch (error) {
@@ -117,10 +46,11 @@ const TemplateModal = ({ open, onClose, theme, refreshTemplates }) => {
   };
 
   useEffect(() => {
-    if (!open && editor) {
-      editor.commands.clearContent();
+    if (!open) {
+      form.resetFields();
+      setContent('');
     }
-  }, [open, editor]);
+  }, [open]);
 
   return (
     <Modal
@@ -201,20 +131,26 @@ const TemplateModal = ({ open, onClose, theme, refreshTemplates }) => {
         </Form.Item>
 
         <Form.Item label="Body">
-          <div className="editor-content">
-            {editor && <EditorContent editor={editor} />}
-          </div>
-        </Form.Item>
-        <Form.Item>
-          <div className={`editor-container ${theme === 'dark' ? 'dark-editor' : ''}`}>
-            <CustomToolbar 
-              editor={editor} 
-              onImageUpload={handleImageUpload}
-              onInsertToken={insertToken}
-              theme={theme}
-            />
-            {editor && <EditorContent editor={editor} />}
-          </div>
+          <SunEditor 
+            setOptions={{
+              height: 200,
+              buttonList: [
+                ['undo', 'redo', 'font', 'fontSize', 'formatBlock'],
+                ['bold', 'underline', 'italic', 'strike', 'subscript', 'superscript'],
+                ['removeFormat'],
+                ['outdent', 'indent'],
+                ['align', 'horizontalRule', 'list', 'table'],
+                ['link', 'image', 'video'],
+                ['fullScreen', 'showBlocks', 'codeView'],
+                ['preview', 'print'],
+                ['save']
+              ],
+              attributes: {
+                class: theme === 'dark' ? 'dark-theme-editor' : 'light-theme-editor'
+              }
+            }}
+            onChange={setContent}
+          />
         </Form.Item>
       </Form>
     </Modal>
