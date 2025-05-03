@@ -4,7 +4,7 @@ import { Input } from "../components/ui/input";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Lock, Eye, EyeOff } from "lucide-react";
-import logo from "../assets/img/Logo/logo.jpg";
+import logo from "../assets/img/Logo/logo.png";
 import axios from "axios";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";

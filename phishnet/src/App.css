@@ -243,3 +243,140 @@ body.light-mode {
   --sidebar-bg: #F0F0F0;
   --hover-bg: #d6d6d6;
 }
+
+/* Add these styles at the bottom of the file */
+
+/* SunEditor Dark Theme Overrides */
+/* SunEditor Dark Theme */
+.sun-editor.dark-theme-editor {
+  background-color: #1A1A1A !important;
+  border: 1px solid #444 !important;
+  border-radius: 4px;
+}
+
+.sun-editor.dark-theme-editor .se-toolbar {
+  background-color: #1A1A1A !important;
+  border-bottom: 1px solid #444 !important;
+}
+
+.sun-editor.dark-theme-editor .se-btn {
+  color: #fff !important;
+  transition: all 0.2s ease;
+}
+
+.sun-editor.dark-theme-editor .se-btn:hover {
+  background-color: #FF6B00 !important;
+  border-color: #FF6B00 !important;
+}
+
+.sun-editor.dark-theme-editor .se-btn:active,
+.sun-editor.dark-theme-editor .se-btn.active {
+  background-color: #CC5500 !important;
+}
+
+.sun-editor.dark-theme-editor .se-resizing-bar {
+  background-color: #1A1A1A !important;
+  border-top: 1px solid #444 !important;
+}
+
+.sun-editor.dark-theme-editor .se-editor {
+  background-color: #1A1A1A !important;
+  color: #fff !important;
+}
+
+/* Light Theme Orange Buttons */
+.sun-editor.light-theme-editor .se-btn:hover {
+  background-color: #FFE5D6 !important;
+}
+
+.sun-editor.light-theme-editor .se-btn:active,
+.sun-editor.light-theme-editor .se-btn.active {
+  background-color: #FFD1B3 !important;
+}
+
+/* Generic Editor Styles */
+.sun-editor .se-btn {
+  border-radius: 4px !important;
+  margin: 2px !important;
+}
+
+.sun-editor .se-toolbar {
+  gap: 4px !important;
+  padding: 4px !important;
+}
+/* Template Modal Buttons - More specific selectors */
+.ant-modal-footer .template-btn {
+  transition: all 0.3s cubic-bezier(0.645, 0.045, 0.355, 1) !important;
+}
+
+/* Default button style */
+.ant-modal-footer .template-btn.template-btn-default {
+  color: #FF6B00 !important;
+  border-color: #FF6B00 !important;
+  background: transparent !important;
+}
+
+.ant-modal-footer .template-btn.template-btn-default:not(:disabled):hover {
+  color: white !important;
+  background: #FF6B00 !important;
+  border-color: #FF6B00 !important;
+}
+
+.ant-modal-footer .template-btn.template-btn-default:not(:disabled):active {
+  background: #CC5500 !important;
+  border-color: #CC5500 !important;
+}
+
+/* Orange Theme Buttons */
+.orange-btn.secondary-btn {
+  color: #FF6B00 !important;
+  border-color: #FF6B00 !important;
+  background: transparent !important;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.orange-btn.secondary-btn:not(:disabled):hover {
+  color: white !important;
+  background: #FF6B00 !important;
+  border-color: #FF6B00 !important;
+  transform: translateY(-1px);
+}
+
+.orange-btn.primary-btn {
+  background: #FF6B00 !important;
+  border-color: #FF6B00 !important;
+  color: white !important;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.orange-btn.primary-btn:not(:disabled):hover {
+  background: #FF8C00 !important;
+  border-color: #FF8C00 !important;
+  transform: translateY(-1px);
+}
+
+/* Dark mode overrides */
+.dark-modal .orange-btn.secondary-btn {
+  color: #FF6B00 !important;
+  border-color: #FF6B00 !important;
+}
+
+.dark-modal .orange-btn.secondary-btn:not(:disabled):hover {
+  background: #FF6B00 !important;
+  color: white !important;
+}
+
+.dark-modal .orange-btn.primary-btn {
+  background: #FF6B00 !important;
+  border-color: #FF6B00 !important;
+}
+
+.dark-modal .orange-btn.primary-btn:not(:disabled):hover {
+  background: #FF8C00 !important;
+  border-color: #FF8C00 !important;
+}
+
+/* Force button text colors in dark mode */
+.dark-modal .ant-btn {
+  color: inherit !important;
+}

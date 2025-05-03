@@ -5,7 +5,7 @@ import { Input } from "../components/ui/input";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Lock, Mail } from "lucide-react";
-import logo from "../assets/img/Logo/logo.jpg";
+import logo from "../assets/img/Logo/logo.png"; // ✅ Ensure correct import
 import authService from "../services/auth/authService"; // 🔗 API Service
 import { toast } from "react-toastify"; // 📢 Notifications
 import "react-toastify/dist/ReactToastify.css"; // 📢 Toastify Styles

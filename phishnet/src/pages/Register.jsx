@@ -4,7 +4,7 @@ import { Input } from "../components/ui/input";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Mail, Lock, User, CheckCircle, XCircle, Eye, EyeOff } from "lucide-react"; // ✅ Icons
-import logo from "../assets/img/Logo/logo.jpg";
+import logo from "../assets/img/Logo/logo.png"; // ✅ Ensure correct import
 import authService from "../services/auth/authService";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";

@@ -6,7 +6,7 @@ import { Mail } from "lucide-react";
 import resetService from "../services/auth/resetService";
 import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
-import logo from "../assets/img/Logo/logo.jpg"; // ✅ Ensure correct import
+import logo from "../assets/img/Logo/logo.png"; // ✅ Ensure correct import
 
 const ForgotPassword = () => {
   const [email, setEmail] = useState("");
@@ -17,21 +17,24 @@ const ForgotPassword = () => {
   const handleResetRequest = async (e) => {
     e.preventDefault();
     setLoading(true);
-    setShowPopup(true); // ✅ Show popup immediately
 
     try {
       await resetService.requestPasswordReset(email);
+    } catch (error) {
+      // ❗Even if backend fails (e.g., email not found), show same message
+      // Log error for debugging if needed
+      console.error("Reset Error:", error.response?.data || error.message);
+    } finally {
+      // ✅ Show popup in both success or failure
+      setShowPopup(true);
       toast.success("If the email exists, a reset link has been sent.");
-      
+
       setTimeout(() => {
         setShowPopup(false);
         setEmail(""); // ✅ Clear input
         navigate("/login", { replace: true }); // ✅ Redirect properly
       }, 3000);
-    } catch (error) {
-      toast.error(error.response?.data?.message || "Failed to send reset link.");
-      setShowPopup(false); // Hide popup on error
-    } finally {
+
       setLoading(false);
     }
   };
@@ -44,7 +47,11 @@ const ForgotPassword = () => {
           <CardHeader>
             <div className="flex flex-col items-center">
               <div className="w-20 h-20 rounded-full bg-orange-500/20 flex items-center justify-center mb-4 p-1">
-                <img src={logo} alt="Logo" className="w-full h-full rounded-full object-cover border-2 border-orange-500/30 shadow-lg" />
+                <img
+                  src={logo}
+                  alt="Logo"
+                  className="w-full h-full rounded-full object-cover border-2 border-orange-500/30 shadow-lg"
+                />
               </div>
               <CardTitle className="text-center text-2xl mt-2 text-white">Forgot Password?</CardTitle>
             </div>
@@ -78,7 +85,10 @@ const ForgotPassword = () => {
 
             {/* Back to Login Link */}
             <p className="text-center text-gray-400 mt-4 text-sm">
-              <span className="text-orange-500 hover:underline cursor-pointer" onClick={() => navigate("/login")}>
+              <span
+                className="text-orange-500 hover:underline cursor-pointer"
+                onClick={() => navigate("/login")}
+              >
                 Back to Login
               </span>
             </p>
@@ -86,13 +96,13 @@ const ForgotPassword = () => {
         </Card>
       </div>
 
-      {/* ✅ Fancy Confirmation Popup (Fixed & Shows Immediately) */}
+      {/* ✅ Fancy Confirmation Popup (Always shown regardless of backend response) */}
       {showPopup && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
           <div className="bg-[#1A1A1A] text-white p-6 rounded-lg shadow-lg text-center border border-orange-500/50">
-            <h3 className="text-lg">📩 Reset Link Sent</h3>
+            <h3 className="text-lg font-semibold">📩 Reset Link Sent</h3>
             <p className="text-gray-400 text-sm mt-2">
-              If this email exists, a reset link has been sent. <br /> Check your inbox (or spam folder).
+              If this email exists, a reset link has been sent. <br /> Check your inbox or spam folder.
             </p>
           </div>
         </div>
