@@ -18,37 +18,36 @@ router.post("/forgot-password", async (req, res) => {
   try {
     const { email } = req.body;
 
-    // 🔍 Find user by email
+    // 🔍 Try to find user by email
     const user = await User.findOne({ where: { email } });
-    if (!user) {
-      return res.status(404).json({ message: "No account found with that email!" });
+
+    // 🧪 If user exists, generate token and send email
+    if (user) {
+      const token = crypto.randomBytes(32).toString("hex");
+      const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 mins
+
+      await sequelize.query(
+        "INSERT INTO password_reset_tokens (user_id, token, expires_at) VALUES (:user_id, :token, :expiresAt)",
+        {
+          replacements: { user_id: user.id, token, expiresAt },
+          type: Sequelize.QueryTypes.INSERT,
+        }
+      );
+
+      const resetLink = `http://localhost:5173/reset-password?token=${token}`;
+      const emailHtml = passwordResetTemplate(user.name, resetLink);
+      await sendEmail(user.email, "🔑 Password Reset Request", emailHtml);
     }
 
-    // 🔑 Generate Secure Reset Token
-    const token = crypto.randomBytes(32).toString("hex");
-    const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // Token expires in 15 minutes
+    // ✅ ALWAYS respond with success message (even if user doesn't exist)
+    res.json({ message: "📧 Password reset link sent to your email (if registered)!" });
 
-    // 💾 Store Reset Token in Database
-    await sequelize.query(
-      "INSERT INTO password_reset_tokens (user_id, token, expires_at) VALUES (:user_id, :token, :expiresAt)",
-      {
-        replacements: { user_id: user.id, token, expiresAt },
-        type: Sequelize.QueryTypes.INSERT,
-      }
-    );
-
-    // ✉️ Send Password Reset Email with User’s Name
-    const resetLink = `http://localhost:5173/reset-password?token=${token}`; // ✅ Fix: Use correct frontend port
-    const emailHtml = passwordResetTemplate(user.name, resetLink);
-
-    await sendEmail(user.email, "🔑 Password Reset Request", emailHtml);
-
-    res.json({ message: "📧 Password reset email sent!" });
   } catch (error) {
     console.error("❌ Forgot Password Error:", error);
     res.status(500).json({ message: "Server error!" });
   }
 });
+
 
 // ✅ Login Route
 router.post("/login", async (req, res) => {
