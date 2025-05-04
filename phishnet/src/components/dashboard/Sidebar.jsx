@@ -24,7 +24,7 @@ const Sidebar = ({ isCollapsed, theme }) => {
       {!isCollapsed && (
         <div className="flex items-center p-4 border-b border-gray-700">
           <img 
-            src="/logo.jpg" 
+            src="/logo.png" 
             alt="PhishNet Logo" 
             className="w-8 h-8 mr-3 rounded-sm"
           />

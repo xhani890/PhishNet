@@ -1,14 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { Modal, Button, Form, Input, Select, notification, Upload, message } from 'antd';
+import { Modal, Button, Form, Input, Select, notification, Upload, message, Tag } from 'antd';
 import SunEditor from 'suneditor-react';
 import 'suneditor/dist/css/suneditor.min.css';
-import { UploadOutlined, DownloadOutlined } from '@ant-design/icons';
+import { UploadOutlined, DownloadOutlined, MailOutlined, PlusOutlined } from '@ant-design/icons';
 
 const TemplateModal = ({ open, onClose, theme, refreshTemplates }) => {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
+  const [testLoading, setTestLoading] = useState(false);
   const [content, setContent] = useState('');
   const [isExportable, setIsExportable] = useState(false);
+  const [testEmail, setTestEmail] = useState('');
+  const [customTypes, setCustomTypes] = useState(['phishing', 'training']);
+  const [inputVisible, setInputVisible] = useState(false);
+  const [inputValue, setInputValue] = useState('');
 
   const editorOptions = {
     height: 200,
@@ -33,7 +38,6 @@ const TemplateModal = ({ open, onClose, theme, refreshTemplates }) => {
     }
   };
 
-  // Check if form has enough data to be exportable
   useEffect(() => {
     const values = form.getFieldsValue();
     setIsExportable(!!(values.name && content));
@@ -43,27 +47,35 @@ const TemplateModal = ({ open, onClose, theme, refreshTemplates }) => {
     try {
       setLoading(true);
       const values = await form.validateFields();
-
-      const formData = new FormData();
-      formData.append('name', values.name);
-      formData.append('type', values.type);
-      formData.append('content', content);
-      formData.append('subject', values.subject);
-      formData.append('description', values.description);
-      formData.append('complexity', values.complexity);
-
+      const userId = localStorage.getItem('userId'); // Get from your auth system
+  
       const response = await fetch('http://localhost:5000/api/templates', {
         method: 'POST',
-        body: formData
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          userId,
+          name: values.name,
+          subject: values.subject,
+          html: content,
+          text: '', // Add text conversion if needed
+          type: values.type,
+          complexity: values.complexity,
+          description: values.description
+        })
       });
-
-      if (!response.ok) throw new Error('Failed to save template');
-
+  
+      const result = await response.json();
+  
+      if (!response.ok) throw new Error(result.message || 'Failed to save template');
+  
       notification.success({
         message: 'Template Saved',
         description: 'Template has been saved successfully!'
       });
-
+  
       refreshTemplates?.();
       onClose();
     } catch (error) {
@@ -80,33 +92,29 @@ const TemplateModal = ({ open, onClose, theme, refreshTemplates }) => {
     try {
       const values = form.getFieldsValue();
       
-      // Extract image URLs from content
-      const imageUrls = [];
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(content, 'text/html');
-      doc.querySelectorAll('img').forEach(img => {
-        imageUrls.push(img.src);
-      });
-
-      const templateData = {
-        metadata: {
-          name: values.name,
-          type: values.type,
-          subject: values.subject,
-          description: values.description,
-          complexity: values.complexity,
-          createdAt: new Date().toISOString(),
-          version: '1.0'
-        },
-        content: content,
-        assets: imageUrls
-      };
+      const htmlTemplate = `<!DOCTYPE html>
+<html>
+<head>
+  <!-- TEMPLATE METADATA -->
+  <!-- NAME: ${values.name || 'Untitled Template'} -->
+  <!-- TYPE: ${values.type || 'phishing'} -->
+  <!-- SUBJECT: ${values.subject || 'No Subject'} -->
+  <!-- DESCRIPTION: ${values.description || ''} -->
+  <!-- COMPLEXITY: ${values.complexity || 'medium'} -->
+  <!-- CREATED: ${new Date().toISOString()} -->
+  <!-- VERSION: 1.0 -->
+  <title>${values.name || 'Email Template'}</title>
+</head>
+<body>
+${content}
+</body>
+</html>`;
       
-      const blob = new Blob([JSON.stringify(templateData, null, 2)], { type: 'application/json' });
+      const blob = new Blob([htmlTemplate], { type: 'text/html' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `template_${values.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_${new Date().getTime()}.json`;
+      link.download = `template_${values.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_${new Date().getTime()}.html`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -114,7 +122,7 @@ const TemplateModal = ({ open, onClose, theme, refreshTemplates }) => {
 
       notification.success({
         message: 'Export Successful',
-        description: 'Template exported with all assets and metadata'
+        description: 'Template exported as HTML file'
       });
     } catch (error) {
       notification.error({
@@ -128,63 +136,158 @@ const TemplateModal = ({ open, onClose, theme, refreshTemplates }) => {
     const reader = new FileReader();
     reader.onload = async (e) => {
       try {
-        const data = JSON.parse(e.target.result);
+        const htmlContent = e.target.result;
         
-        // Validate imported file structure
-        if (!data.metadata || !data.content) {
-          throw new Error('Invalid template file format');
+        const metadata = {};
+        const metaRegex = /<!--\s*([^:]+):\s*([^->]+)\s*-->/g;
+        let match;
+        while ((match = metaRegex.exec(htmlContent))) {
+          metadata[match[1].trim().toLowerCase()] = match[2].trim();
         }
-
-        // Set form values from metadata
+        
+        const bodyStart = htmlContent.indexOf('<body>');
+        const bodyEnd = htmlContent.indexOf('</body>');
+        let bodyContent = '';
+        
+        if (bodyStart !== -1 && bodyEnd !== -1) {
+          bodyContent = htmlContent.substring(bodyStart + 6, bodyEnd);
+        } else {
+          bodyContent = htmlContent;
+        }
+        
         form.setFieldsValue({
-          name: data.metadata.name,
-          type: data.metadata.type,
-          subject: data.metadata.subject,
-          description: data.metadata.description,
-          complexity: data.metadata.complexity
+          name: metadata.name || `Imported Template ${new Date().toLocaleString()}`,
+          type: metadata.type || 'phishing',
+          subject: metadata.subject || 'Important Bulletin Alert',
+          description: metadata.description || 'Automatically imported template',
+          complexity: metadata.complexity || 'medium'
         });
-
-        // Set content (including any embedded assets)
-        setContent(data.content);
+        
+        setContent(bodyContent);
 
         notification.success({
           message: 'Import Successful',
-          description: `Template "${data.metadata.name}" imported with ${data.assets?.length || 0} assets`
+          description: 'HTML template has been imported successfully',
+          duration: 3
         });
       } catch (error) {
         notification.error({
           message: 'Import Failed',
-          description: error.message || 'Failed to import template'
+          description: error.message || 'Failed to process imported file',
+          duration: 5
         });
       }
     };
     reader.onerror = () => {
       notification.error({
         message: 'Import Failed',
-        description: 'Error reading template file'
+        description: 'Error reading template file',
+        duration: 5
       });
     };
     reader.readAsText(file);
-    return false; // Prevent default upload behavior
+    return false;
   };
 
-  // Before import validation
+  const handleTestEmail = async () => {
+    try {
+      const values = form.getFieldsValue();
+      if (!values.subject || !content) {
+        message.error('Please fill in subject and content before sending test email');
+        return;
+      }
+  
+      setTestLoading(true);
+      
+      // Collect test data through a form instead of simple prompt
+      const testData = {
+        email: prompt('Enter test email address:', testEmail || ''),
+        firstName: prompt('Enter test first name:', 'John'),
+        lastName: prompt('Enter test last name:', 'Doe')
+      };
+  
+      if (!testData.email) {
+        setTestLoading(false);
+        return;
+      }
+  
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(testData.email)) {
+        message.error('Please enter a valid email address');
+        setTestLoading(false);
+        return;
+      }
+      
+      setTestEmail(testData.email);
+  
+      const response = await fetch('http://localhost:5000/api/templates/test', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          ...testData,
+          subject: values.subject,
+          content,
+          templateName: values.name || 'Test Template',
+          metadata: {
+            type: values.type,
+            complexity: values.complexity
+          }
+        })
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || 'Failed to send test email');
+      }
+
+      notification.success({
+        message: 'Test Email Sent',
+        description: `Test email has been sent to ${email}. Check your inbox.`,
+        duration: 5
+      });
+    } catch (error) {
+      console.error('Test email error:', error);
+      notification.error({
+        message: 'Test Email Failed',
+        description: error.message || 'Error sending test email',
+        duration: 5
+      });
+    } finally {
+      setTestLoading(false);
+    }
+  };
+
+  const handleInputConfirm = () => {
+    if (inputValue && !customTypes.includes(inputValue)) {
+      setCustomTypes([...customTypes, inputValue]);
+      form.setFieldsValue({ type: inputValue });
+    }
+    setInputVisible(false);
+    setInputValue('');
+  };
+
   const beforeImport = (file) => {
-    const isJson = file.type === 'application/json' || file.name.endsWith('.json');
-    if (!isJson) {
-      message.error('You can only upload JSON files!');
+    const isHtml = file.type === 'text/html' || file.name.endsWith('.html');
+    if (!isHtml) {
+      message.error('You can only upload HTML files!');
     }
     const isLt2M = file.size / 1024 / 1024 < 2;
     if (!isLt2M) {
       message.error('File must be smaller than 2MB!');
     }
-    return isJson && isLt2M;
+    return isHtml && isLt2M;
   };
 
   useEffect(() => {
     if (!open) {
       form.resetFields();
       setContent('');
+      setInputVisible(false);
+      setInputValue('');
     }
   }, [open]);
 
@@ -209,7 +312,7 @@ const TemplateModal = ({ open, onClose, theme, refreshTemplates }) => {
           beforeUpload={beforeImport}
           customRequest={({ file }) => handleImport(file)}
           showUploadList={false}
-          accept=".json"
+          accept=".html,.htm"
           disabled={loading}
         >
           <Button 
@@ -231,7 +334,10 @@ const TemplateModal = ({ open, onClose, theme, refreshTemplates }) => {
         </Button>,
         <Button 
           key="test" 
-          disabled={loading} 
+          icon={<MailOutlined />}
+          onClick={handleTestEmail}
+          disabled={loading}
+          loading={testLoading}
           className="orange-btn secondary-btn"
         >
           Send Test Mail
@@ -252,13 +358,31 @@ const TemplateModal = ({ open, onClose, theme, refreshTemplates }) => {
           <Form.Item
             name="type"
             label="Type"
-            rules={[{ required: true, message: 'Please select a type' }]}
+            rules={[{ required: true, message: 'Please select or create a type' }]}
           >
             <Select
-              options={[
-                { value: 'phishing', label: 'Phishing - Home & Personal' },
-                { value: 'training', label: 'Training' }
-              ]}
+              dropdownRender={(menu) => (
+                <>
+                  {menu}
+                  <div style={{ padding: '8px', display: 'flex', flexWrap: 'nowrap', alignItems: 'center' }}>
+                    <Input
+                      style={{ flex: 'auto' }}
+                      value={inputValue}
+                      onChange={(e) => setInputValue(e.target.value)}
+                      onPressEnter={handleInputConfirm}
+                      placeholder="Add new type"
+                    />
+                    <Button
+                      type="text"
+                      icon={<PlusOutlined />}
+                      onClick={handleInputConfirm}
+                    >
+                      Add
+                    </Button>
+                  </div>
+                </>
+              )}
+              options={customTypes.map(type => ({ value: type, label: type }))}
             />
           </Form.Item>
 
