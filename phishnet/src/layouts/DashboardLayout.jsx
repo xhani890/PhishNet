@@ -6,7 +6,8 @@ const DashboardLayout = ({ children }) => {
   const { isCollapsed, theme } = useDashboard();
 
   return (
-    <div className={`flex h-screen ${theme}`}>
+    // theme === 'dark' ? 'bg-gray-900 text-white' : 'bg-white text-gray-900'
+    <div className={`flex h-screen ${theme}`}> 
       <Sidebar />
       <div className={`flex-1 transition-all ${isCollapsed ? 'ml-16' : 'ml-64'}`}>
         <Header />
