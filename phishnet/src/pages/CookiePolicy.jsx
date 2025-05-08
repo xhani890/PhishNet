@@ -12,4 +12,5 @@ const CookiePolicy = () => {
   );
 };
 
+// Exporting the cookies policy component for use by the system
 export default CookiePolicy;
