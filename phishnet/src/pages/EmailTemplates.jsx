@@ -7,7 +7,7 @@ const EmailTemplates = ({ theme }) => {
   const [isModalOpen, setModalOpen] = useState(false);
 
   const templates = [
-    // Sample data - replace with real data
+    // Sample Data - Draft - To be replaced with Real Data
     { 
       name: "Amazon: Locked Account", 
       type: "Phishing - Home & Personal", 
@@ -15,7 +15,7 @@ const EmailTemplates = ({ theme }) => {
       subject: "Account Locked ID: DTOPO-QUETPICH",
       actions: ["preview", "edit", "delete"]
     },
-    // Add other template objects...
+    // Need to Add other Template Objects...
   ];
 
   const handleCreateNewTemplate = () => {
