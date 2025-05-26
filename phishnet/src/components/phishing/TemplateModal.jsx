@@ -1,43 +1,45 @@
 import React, { useState, useEffect } from 'react';
-import { Modal, Button, Form, Input, Select, notification, Upload, message, Tag } from 'antd';
+import { Modal, Button, Form, Input, Select, notification, Upload, Tooltip, Space, Divider } from 'antd';
+import { UploadOutlined, DownloadOutlined, MailOutlined, SaveOutlined } from '@ant-design/icons';
 import SunEditor from 'suneditor-react';
 import 'suneditor/dist/css/suneditor.min.css';
-import { UploadOutlined, DownloadOutlined, MailOutlined, PlusOutlined } from '@ant-design/icons';
+import axios from 'axios';
+import PropTypes from 'prop-types';
+import { getUserIdFromToken } from '../../utils/auth';
 
-const TemplateModal = ({ open, onClose, theme, refreshTemplates }) => {
+const TemplateModal = ({ open, onClose, theme, refreshTemplates, templateData, isEditMode }) => {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
-  const [testLoading, setTestLoading] = useState(false);
   const [content, setContent] = useState('');
   const [isExportable, setIsExportable] = useState(false);
   const [testEmail, setTestEmail] = useState('');
-  const [customTypes, setCustomTypes] = useState(['phishing', 'training']);
-  const [inputVisible, setInputVisible] = useState(false);
-  const [inputValue, setInputValue] = useState('');
+  const [testLoading, setTestLoading] = useState(false);
+  const [importLoading, setImportLoading] = useState(false);
 
-  const editorOptions = {
-    height: 200,
-    buttonList: [
-      ['undo', 'redo', 'font', 'fontSize', 'formatBlock'],
-      ['bold', 'underline', 'italic', 'strike', 'subscript', 'superscript'],
-      ['removeFormat'],
-      ['outdent', 'indent'],
-      ['align', 'horizontalRule', 'list', 'table'],
-      ['link', 'image', 'video'],
-      ['fullScreen', 'showBlocks', 'codeView'],
-      ['preview', 'print'],
-      ['save']
-    ],
-    attributes: {
-      class: theme === 'dark' ? 'dark-theme-editor' : 'light-theme-editor'
-    },
-    resizingBar: false,
-    styles: {
-      'background-color': theme === 'dark' ? '#1A1A1A' : '#ffffff',
-      'color': theme === 'dark' ? '#ffffff' : '#333333'
+  // Reset form when modal closes
+  useEffect(() => {
+    if (!open) {
+      form.resetFields();
+      setContent('');
+      setTestEmail('');
     }
-  };
+  }, [open, form]);
 
+  // Load template data when editing
+  useEffect(() => {
+    if (isEditMode && templateData && open) {
+      form.setFieldsValue({
+        name: templateData.name,
+        subject: templateData.subject,
+        type: templateData.type,
+        complexity: templateData.complexity,
+        description: templateData.description || '',
+      });
+      setContent(templateData.html);
+    }
+  }, [isEditMode, templateData, open, form]);
+
+  // Track if template can be exported based on form values
   useEffect(() => {
     const values = form.getFieldsValue();
     setIsExportable(!!(values.name && content));
@@ -46,52 +48,93 @@ const TemplateModal = ({ open, onClose, theme, refreshTemplates }) => {
   const handleSave = async () => {
     try {
       setLoading(true);
+      
+      // Validate form fields
       const values = await form.validateFields();
-      const userId = localStorage.getItem('userId'); // Get from your auth system
-  
-      const response = await fetch('http://localhost:5000/api/templates', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify({
-          userId,
-          name: values.name,
-          subject: values.subject,
-          html: content,
-          text: '', // Add text conversion if needed
-          type: values.type,
-          complexity: values.complexity,
-          description: values.description
-        })
-      });
-  
-      const result = await response.json();
-  
-      if (!response.ok) throw new Error(result.message || 'Failed to save template');
-  
-      notification.success({
-        message: 'Template Saved',
-        description: 'Template has been saved successfully!'
-      });
-  
-      refreshTemplates?.();
+      
+      // Get JWT token from localStorage
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        throw new Error('Authentication required');
+      }
+      
+      // Extract user ID from token or use the one from template data if editing
+      const userId = isEditMode ? templateData.userId : (getUserIdFromToken() || '1');
+      
+      // Create template data object
+      const templatePayload = {
+        userId,
+        name: values.name,
+        subject: values.subject,
+        html: content,
+        text: templateData?.text || '',
+        type: values.type || 'phishing',
+        complexity: values.complexity || 'medium',
+        description: values.description || ''
+      };
+      
+      let response;
+      
+      if (isEditMode) {
+        // Update existing template
+        response = await axios.put(`http://localhost:5000/api/templates/${templateData.id}`, templatePayload, {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        
+        notification.success({
+          message: 'Template Updated',
+          description: 'Your email template has been updated successfully!'
+        });
+      } else {
+        // Create new template
+        response = await axios.post('http://localhost:5000/api/templates', templatePayload, {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        
+        notification.success({
+          message: 'Template Created',
+          description: 'Your email template has been saved successfully!'
+        });
+      }
+      
+      // Close modal and refresh templates list
       onClose();
+      if (refreshTemplates) {
+        refreshTemplates();
+      }
+      
     } catch (error) {
+      // Handle errors
+      console.error('Error saving template:', error);
+      
+      const errorMessage = error.response?.data?.message || 'Failed to save template';
+      
       notification.error({
         message: 'Save Failed',
-        description: error.message || 'Error saving template'
+        description: errorMessage
       });
     } finally {
       setLoading(false);
     }
   };
 
+  // Improved export function with better HTML formatting
   const handleExport = () => {
     try {
       const values = form.getFieldsValue();
       
+      // Format the current date for the filename
+      const now = new Date();
+      const dateStr = now.toISOString().split('T')[0];
+      const timeStr = now.toTimeString().split(' ')[0].replace(/:/g, '-');
+      
+      // Create a properly formatted HTML document
       const htmlTemplate = `<!DOCTYPE html>
 <html>
 <head>
@@ -101,20 +144,47 @@ const TemplateModal = ({ open, onClose, theme, refreshTemplates }) => {
   <!-- SUBJECT: ${values.subject || 'No Subject'} -->
   <!-- DESCRIPTION: ${values.description || ''} -->
   <!-- COMPLEXITY: ${values.complexity || 'medium'} -->
-  <!-- CREATED: ${new Date().toISOString()} -->
+  <!-- CREATED: ${now.toISOString()} -->
   <!-- VERSION: 1.0 -->
-  <title>${values.name || 'Email Template'}</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${values.subject || 'Email Template'}</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      max-width: 100%;
+      margin: 0;
+      padding: 0;
+    }
+    img {
+      max-width: 100%;
+      height: auto;
+    }
+    a {
+      color: #FF6B00;
+    }
+    .email-container {
+      max-width: 600px;
+      margin: 0 auto;
+    }
+  </style>
 </head>
 <body>
-${content}
+  <div class="email-container">
+    ${content}
+  </div>
 </body>
 </html>`;
       
+      // Create a blob and trigger download
       const blob = new Blob([htmlTemplate], { type: 'text/html' });
       const url = URL.createObjectURL(blob);
+      
       const link = document.createElement('a');
       link.href = url;
-      link.download = `template_${values.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_${new Date().getTime()}.html`;
+      link.download = `${values.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_${dateStr}_${timeStr}.html`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -133,6 +203,7 @@ ${content}
   };
 
   const handleImport = (file) => {
+    setImportLoading(true);
     const reader = new FileReader();
     reader.onload = async (e) => {
       try {
@@ -176,6 +247,8 @@ ${content}
           description: error.message || 'Failed to process imported file',
           duration: 5
         });
+      } finally {
+        setImportLoading(false);
       }
     };
     reader.onerror = () => {
@@ -184,6 +257,7 @@ ${content}
         description: 'Error reading template file',
         duration: 5
       });
+      setImportLoading(false);
     };
     reader.readAsText(file);
     return false;
@@ -191,109 +265,59 @@ ${content}
 
   const handleTestEmail = async () => {
     try {
-      const values = form.getFieldsValue();
-      if (!values.subject || !content) {
-        message.error('Please fill in subject and content before sending test email');
-        return;
-      }
-  
       setTestLoading(true);
       
-      // Collect test data through a form instead of simple prompt
-      const testData = {
-        email: prompt('Enter test email address:', testEmail || ''),
-        firstName: prompt('Enter test first name:', 'John'),
-        lastName: prompt('Enter test last name:', 'Doe')
-      };
-  
-      if (!testData.email) {
-        setTestLoading(false);
-        return;
-      }
-  
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(testData.email)) {
-        message.error('Please enter a valid email address');
-        setTestLoading(false);
-        return;
+      // Validate that test email is provided
+      if (!testEmail || !testEmail.trim()) {
+        throw new Error('Please enter a valid email address');
       }
       
-      setTestEmail(testData.email);
-  
-      const response = await fetch('http://localhost:5000/api/templates/test', {
-        method: 'POST',
+      // Validate form fields to ensure we have all required data
+      const values = await form.validateFields(['subject']);
+      
+      // Get JWT token from localStorage
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        throw new Error('Authentication required');
+      }
+      
+      // Create test email payload
+      const testEmailPayload = {
+        recipientEmail: testEmail,
+        subject: values.subject,
+        htmlContent: content,
+      };
+      
+      // Send test email request
+      await axios.post('http://localhost:5000/api/templates/test-email', testEmailPayload, {
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify({
-          ...testData,
-          subject: values.subject,
-          content,
-          templateName: values.name || 'Test Template',
-          metadata: {
-            type: values.type,
-            complexity: values.complexity
-          }
-        })
+          'Authorization': `Bearer ${token}`
+        }
       });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.message || 'Failed to send test email');
-      }
-
+      
       notification.success({
         message: 'Test Email Sent',
-        description: `Test email has been sent to ${email}. Check your inbox.`,
-        duration: 5
+        description: `A test email has been sent to ${testEmail}`
       });
+      
     } catch (error) {
-      console.error('Test email error:', error);
+      console.error('Error sending test email:', error);
+      
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to send test email';
+      
       notification.error({
         message: 'Test Email Failed',
-        description: error.message || 'Error sending test email',
-        duration: 5
+        description: errorMessage
       });
     } finally {
       setTestLoading(false);
     }
   };
 
-  const handleInputConfirm = () => {
-    if (inputValue && !customTypes.includes(inputValue)) {
-      setCustomTypes([...customTypes, inputValue]);
-      form.setFieldsValue({ type: inputValue });
-    }
-    setInputVisible(false);
-    setInputValue('');
-  };
-
-  const beforeImport = (file) => {
-    const isHtml = file.type === 'text/html' || file.name.endsWith('.html');
-    if (!isHtml) {
-      message.error('You can only upload HTML files!');
-    }
-    const isLt2M = file.size / 1024 / 1024 < 2;
-    if (!isLt2M) {
-      message.error('File must be smaller than 2MB!');
-    }
-    return isHtml && isLt2M;
-  };
-
-  useEffect(() => {
-    if (!open) {
-      form.resetFields();
-      setContent('');
-      setInputVisible(false);
-      setInputValue('');
-    }
-  }, [open]);
-
   return (
     <Modal
-      title="New Email Template"
+      title={isEditMode ? "Edit Email Template" : "New Email Template"}
       open={open}
       onCancel={onClose}
       className={`${theme === 'dark' ? 'dark-modal' : ''} custom-modal`}
@@ -305,42 +329,7 @@ ${content}
           onClick={onClose}
           className="orange-btn secondary-btn"
         >
-          Back to List
-        </Button>,
-        <Upload 
-          key="import"
-          beforeUpload={beforeImport}
-          customRequest={({ file }) => handleImport(file)}
-          showUploadList={false}
-          accept=".html,.htm"
-          disabled={loading}
-        >
-          <Button 
-            icon={<UploadOutlined />} 
-            disabled={loading} 
-            className="orange-btn secondary-btn"
-          >
-            Import
-          </Button>
-        </Upload>,
-        <Button 
-          key="export" 
-          icon={<DownloadOutlined />}
-          onClick={handleExport}
-          disabled={!isExportable || loading}
-          className="orange-btn secondary-btn"
-        >
-          Export
-        </Button>,
-        <Button 
-          key="test" 
-          icon={<MailOutlined />}
-          onClick={handleTestEmail}
-          disabled={loading}
-          loading={testLoading}
-          className="orange-btn secondary-btn"
-        >
-          Send Test Mail
+          Cancel
         </Button>,
         <Button 
           key="save" 
@@ -348,41 +337,45 @@ ${content}
           loading={loading} 
           onClick={handleSave} 
           className="orange-btn primary-btn"
+          icon={<SaveOutlined />}
         >
-          Save Template
+          {isEditMode ? "Update Template" : "Save Template"}
         </Button>
       ]}
     >
-      <Form form={form} layout="vertical">
+      <Form 
+        form={form} 
+        layout="vertical" 
+        className={theme === 'dark' ? 'dark-form' : ''}
+      >
+        <Form.Item
+          name="name"
+          label="Template Name"
+          rules={[{ required: true, message: 'Please enter template name' }]}
+        >
+          <Input placeholder="Enter template name" />
+        </Form.Item>
+
+        <Form.Item
+          name="subject"
+          label="Subject"
+          rules={[{ required: true, message: 'Please enter email subject' }]}
+        >
+          <Input placeholder="Email subject line" />
+        </Form.Item>
+
         <div className="grid grid-cols-2 gap-4 mb-4">
           <Form.Item
             name="type"
             label="Type"
-            rules={[{ required: true, message: 'Please select or create a type' }]}
+            rules={[{ required: true, message: 'Please select a type' }]}
+            initialValue="phishing"
           >
             <Select
-              dropdownRender={(menu) => (
-                <>
-                  {menu}
-                  <div style={{ padding: '8px', display: 'flex', flexWrap: 'nowrap', alignItems: 'center' }}>
-                    <Input
-                      style={{ flex: 'auto' }}
-                      value={inputValue}
-                      onChange={(e) => setInputValue(e.target.value)}
-                      onPressEnter={handleInputConfirm}
-                      placeholder="Add new type"
-                    />
-                    <Button
-                      type="text"
-                      icon={<PlusOutlined />}
-                      onClick={handleInputConfirm}
-                    >
-                      Add
-                    </Button>
-                  </div>
-                </>
-              )}
-              options={customTypes.map(type => ({ value: type, label: type }))}
+              options={[
+                { value: 'phishing', label: 'Phishing' },
+                { value: 'training', label: 'Training' }
+              ]}
             />
           </Form.Item>
 
@@ -390,6 +383,7 @@ ${content}
             name="complexity"
             label="Complexity"
             rules={[{ required: true, message: 'Please select complexity' }]}
+            initialValue="medium"
           >
             <Select
               options={[
@@ -402,38 +396,107 @@ ${content}
         </div>
 
         <Form.Item
-          name="name"
-          label="Template Name"
-          rules={[{ required: true, message: 'Please enter template name' }]}
-        >
-          <Input placeholder="Enter template name" />
-        </Form.Item>
-
-        <Form.Item
           name="description"
           label="Description"
         >
-          <Input.TextArea rows={3} />
+          <Input.TextArea rows={3} placeholder="Template description" />
         </Form.Item>
 
-        <Form.Item
-          name="subject"
-          label="Subject"
-          rules={[{ required: true, message: 'Please enter email subject' }]}
-        >
-          <Input placeholder="Email subject line" />
-        </Form.Item>
+        <div className="mb-4 flex justify-between items-center">
+          <Form.Item 
+            label="Email Content" 
+            required
+            className="mb-0 flex-grow"
+          >
+            <div className={`text-xs ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+              Create your email template using the editor below
+            </div>
+          </Form.Item>
+          
+          <Space>
+            <Upload
+              accept=".html"
+              beforeUpload={handleImport}
+              showUploadList={false}
+              disabled={importLoading}
+            >
+              <Button
+                icon={<UploadOutlined />}
+                loading={importLoading}
+                className="orange-btn secondary-btn"
+              >
+                Import
+              </Button>
+            </Upload>
+            
+            <Tooltip title="Export template as HTML file">
+              <Button
+                onClick={handleExport}
+                disabled={!isExportable}
+                icon={<DownloadOutlined />}
+                className="orange-btn secondary-btn"
+              >
+                Export
+              </Button>
+            </Tooltip>
+          </Space>
+        </div>
 
-        <Form.Item label="Body">
-          <SunEditor 
-            setOptions={editorOptions}
-            onChange={setContent}
+        <div className={`${theme === 'dark' ? 'dark-theme-editor' : 'light-theme-editor'} mb-4`}>
+          <SunEditor
             setContents={content}
+            onChange={setContent}
+            setOptions={{
+              height: 400,
+              buttonList: [
+                ['undo', 'redo', 'font', 'fontSize', 'formatBlock'],
+                ['bold', 'underline', 'italic', 'strike', 'subscript', 'superscript'],
+                ['removeFormat'],
+                ['outdent', 'indent'],
+                ['align', 'horizontalRule', 'list', 'table'],
+                ['link', 'image', 'video'],
+                ['fullScreen', 'showBlocks', 'codeView'],
+                ['preview', 'print']
+              ]
+            }}
           />
-        </Form.Item>
+        </div>
+
+        <Divider className={theme === 'dark' ? 'bg-gray-700' : 'bg-gray-300'} />
+        
+        <div className="flex items-center mt-4">
+          <Input 
+            placeholder="Enter email for testing" 
+            value={testEmail} 
+            onChange={(e) => setTestEmail(e.target.value)}
+            addonBefore={<MailOutlined />}
+            className={theme === 'dark' ? 'dark-input' : ''}
+          />
+          <Button
+            onClick={handleTestEmail}
+            loading={testLoading}
+            className="orange-btn primary-btn ml-2"
+          >
+            Send Test Email
+          </Button>
+        </div>
       </Form>
     </Modal>
   );
+};
+
+TemplateModal.propTypes = {
+  open: PropTypes.bool.isRequired,
+  onClose: PropTypes.func.isRequired,
+  theme: PropTypes.string.isRequired,
+  refreshTemplates: PropTypes.func,
+  templateData: PropTypes.object,
+  isEditMode: PropTypes.bool
+};
+
+TemplateModal.defaultProps = {
+  isEditMode: false,
+  templateData: null
 };
 
 export default TemplateModal;

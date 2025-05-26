@@ -29,3 +29,335 @@
     background-color: white;
     color: black;
   }
+  
+  /* Add these at the end of your file */
+  
+  /* Dark mode descriptions */
+  .dark-descriptions th.ant-descriptions-item-label {
+    background-color: #2a2a2a !important;
+    color: white !important;
+    border-color: #444 !important;
+  }
+  
+  .dark-descriptions td.ant-descriptions-item-content {
+    background-color: #1a1a1a !important;
+    color: white !important;
+    border-color: #444 !important;
+  }
+  
+  .dark-modal .ant-descriptions-title {
+    color: white !important;
+  }
+  
+  /* Modal adjustments for dark mode */
+  .dark-modal .ant-modal-content {
+    background-color: #1A1A1A !important;
+    color: white !important;
+  }
+  
+  .dark-modal .ant-modal-header {
+    background-color: #1A1A1A !important;
+    border-bottom: 1px solid #333 !important;
+  }
+  
+  .dark-modal .ant-modal-title {
+    color: white !important;
+  }
+  
+  .dark-modal .ant-modal-close-x {
+    color: white !important;
+  }
+  
+  /* Add these new styles after your existing styles */
+  
+  /* Dark mode form styles */
+  .dark-form .ant-form-item-label > label {
+    color: #ffffff !important;
+  }
+  
+  .dark-form .ant-form-item-label > label.ant-form-item-required::before {
+    color: #ff4d4f !important;
+  }
+  
+  .dark-form .ant-form-item-explain-error {
+    color: #ff4d4f !important;
+  }
+  
+  .dark-form .ant-input,
+  .dark-form .ant-input-affix-wrapper,
+  .dark-form .ant-select-selector,
+  .dark-form .ant-input-number,
+  .dark-form .ant-picker,
+  .dark-form .ant-input-textarea textarea {
+    background-color: #2a2a2a !important;
+    border-color: #434343 !important;
+    color: white !important;
+  }
+  
+  .dark-form .ant-input::placeholder,
+  .dark-form .ant-input-affix-wrapper input::placeholder,
+  .dark-form .ant-input-textarea textarea::placeholder {
+    color: rgba(255, 255, 255, 0.45) !important;
+  }
+  
+  .dark-form .ant-select-arrow,
+  .dark-form .ant-select-clear,
+  .dark-form .ant-input-clear-icon,
+  .dark-form .ant-input-password-icon,
+  .dark-form .ant-input-number-handler-wrap {
+    color: rgba(255, 255, 255, 0.45) !important;
+  }
+  
+  .dark-form .ant-select-selection-item {
+    color: white !important;
+  }
+  
+  .dark-form .ant-divider {
+    border-top-color: #434343 !important;
+  }
+  
+  .dark-form .text-gray-500 {
+    color: #a0a0a0 !important;
+  }
+  
+  /* Button styles */
+  .orange-btn.primary-btn {
+    background-color: #FF6B00 !important;
+    border-color: #FF6B00 !important;
+    color: white !important;
+    transition: all 0.3s ease !important;
+  }
+  
+  .orange-btn.primary-btn:hover {
+    background-color: #FF8C00 !important;
+    border-color: #FF8C00 !important;
+    box-shadow: 0 0 8px rgba(255, 107, 0, 0.5) !important;
+  }
+  
+  .orange-btn.secondary-btn {
+    color: #FF6B00 !important;
+    border-color: #FF6B00 !important;
+    background: transparent !important;
+    transition: all 0.3s ease !important;
+  }
+  
+  .orange-btn.secondary-btn:hover {
+    color: white !important;
+    background-color: #FF6B00 !important;
+    border-color: #FF6B00 !important;
+    box-shadow: 0 0 8px rgba(255, 107, 0, 0.5) !important;
+  }
+  
+  /* Dark input addon and test email section */
+  .dark-input .ant-input-group-addon {
+    background-color: #2a2a2a !important;
+    color: white !important;
+    border-color: #434343 !important;
+  }
+  
+  .dark-input .ant-input {
+    background-color: #2a2a2a !important;
+    border-color: #434343 !important;
+    color: white !important;
+  }
+  
+  /* SunEditor toolbar in dark mode */
+  .dark-theme-editor .se-toolbar {
+    background-color: #2a2a2a !important;
+    border-bottom: 1px solid #434343 !important;
+  }
+  
+  .dark-theme-editor .se-btn-module {
+    background-color: #2a2a2a !important;
+  }
+  
+  .dark-theme-editor .se-btn {
+    color: white !important;
+  }
+  
+  .dark-theme-editor .se-btn:hover {
+    background-color: #FF6B00 !important;
+  }
+  
+  .dark-theme-editor .se-wrapper-inner {
+    background-color: #2a2a2a !important;
+  }
+  
+  .dark-theme-editor .se-wrapper {
+    background-color: #2a2a2a !important;
+    border-color: #434343 !important;
+  }
+  
+  .dark-theme-editor .se-resizing-bar {
+    background-color: #2a2a2a !important;
+    border-color: #434343 !important;
+  }
+  
+  .dark-theme-editor .se-resizing-bar i {
+    color: white !important;
+  }
+  
+  /* Make sure editor content area is also dark */
+  .dark-theme-editor .se-container .se-wrapper .se-wrapper-inner .se-source {
+    background-color: #2a2a2a !important;
+    color: white !important;
+  }
+  
+  .dark-theme-editor .se-container .se-wrapper .se-wrapper-inner iframe {
+    background-color: white !important; /* Keep iframe white for better email design visibility */
+  }
+  
+  /* Add or replace these specific styles to fix the dark mode issues */
+  
+  /* Dark mode modal and form fixes */
+  .dark-modal {
+    color: white !important;
+  }
+  
+  .dark-modal .ant-modal-content {
+    background-color: #1A1A1A !important;
+    color: white !important;
+  }
+  
+  .dark-modal .ant-modal-header {
+    background-color: #1A1A1A !important;
+    border-bottom: 1px solid #333 !important;
+  }
+  
+  .dark-modal .ant-modal-title {
+    color: white !important;
+  }
+  
+  .dark-modal .ant-modal-close-x {
+    color: white !important;
+  }
+  
+  /* Form styles for dark mode */
+  .dark-form .ant-form-item-label > label {
+    color: #ffffff !important;
+  }
+  
+  .dark-form .ant-form-item-required::before {
+    color: #ff4d4f !important;
+  }
+  
+  .dark-form .ant-form-item-explain-error {
+    color: #ff4d4f !important;
+  }
+  
+  /* Input field styles for dark mode */
+  .dark-form .ant-input,
+  .dark-form .ant-input-affix-wrapper,
+  .dark-form .ant-select-selector,
+  .dark-form .ant-input-number,
+  .dark-form .ant-picker,
+  .dark-form .ant-input-textarea textarea {
+    background-color: #2a2a2a !important;
+    border-color: #434343 !important;
+    color: white !important;
+  }
+  
+  /* Input placeholder styles for dark mode */
+  .dark-form .ant-input::placeholder,
+  .dark-form .ant-input-affix-wrapper input::placeholder,
+  .dark-form .ant-input-textarea textarea::placeholder {
+    color: rgba(255, 255, 255, 0.45) !important;
+  }
+  
+  /* Select component styles for dark mode */
+  .dark-form .ant-select:not(.ant-select-customize-input) .ant-select-selector {
+    background-color: #2a2a2a !important;
+    border-color: #434343 !important;
+  }
+  
+  /* Text area styles for dark mode */
+  .dark-form .ant-input-textarea .ant-input {
+    background-color: #2a2a2a !important;
+  }
+  
+  /* Button styles */
+  .orange-btn.primary-btn {
+    background-color: #FF6B00 !important;
+    border-color: #FF6B00 !important;
+    color: white !important;
+    transition: all 0.3s ease !important;
+  }
+  
+  .orange-btn.primary-btn:hover {
+    background-color: #FF8C00 !important;
+    border-color: #FF8C00 !important;
+    box-shadow: 0 0 8px rgba(255, 107, 0, 0.5) !important;
+  }
+  
+  .orange-btn.secondary-btn {
+    color: #FF6B00 !important;
+    border-color: #FF6B00 !important;
+    background: transparent !important;
+    transition: all 0.3s ease !important;
+  }
+  
+  .orange-btn.secondary-btn:hover {
+    color: white !important;
+    background-color: #FF6B00 !important;
+    border-color: #FF6B00 !important;
+    box-shadow: 0 0 8px rgba(255, 107, 0, 0.5) !important;
+  }
+  
+  /* Input addon styles for dark mode */
+  .dark-input .ant-input-group-addon {
+    background-color: #2a2a2a !important;
+    color: white !important;
+    border-color: #434343 !important;
+  }
+  
+  .dark-input .ant-input {
+    background-color: #2a2a2a !important;
+    border-color: #434343 !important;
+    color: white !important;
+  }
+  
+  /* SunEditor toolbar in dark mode */
+  .dark-theme-editor .se-toolbar {
+    background-color: #2a2a2a !important;
+    border-bottom: 1px solid #434343 !important;
+  }
+  
+  .dark-theme-editor .se-btn-module {
+    background-color: #2a2a2a !important;
+  }
+  
+  .dark-theme-editor .se-btn {
+    color: white !important;
+  }
+  
+  .dark-theme-editor .se-btn:hover {
+    background-color: #FF6B00 !important;
+  }
+  
+  .dark-theme-editor .se-wrapper-inner {
+    background-color: #2a2a2a !important;
+  }
+  
+  .dark-theme-editor .se-wrapper {
+    background-color: #2a2a2a !important;
+    border-color: #434343 !important;
+  }
+  
+  .dark-theme-editor .se-resizing-bar {
+    background-color: #2a2a2a !important;
+    border-color: #434343 !important;
+  }
+  
+  .dark-theme-editor .se-resizing-bar i {
+    color: white !important;
+  }
+  
+  /* Make sure editor content area is also dark */
+  .dark-theme-editor .se-container .se-wrapper .se-wrapper-inner .se-source {
+    background-color: #2a2a2a !important;
+    color: white !important;
+  }
+  
+  .dark-theme-editor .se-container .se-wrapper .se-wrapper-inner iframe {
+    background-color: white !important; /* Keep iframe white for better email design visibility */
+  }
