@@ -4,9 +4,8 @@ import { config } from "dotenv";
 import sequelize from "./config/database.js";
 import authRoutes from "./routes/authRoutes.js";
 import templateRoutes from "./routes/templateRoutes.js";
-// Change from default import to named import
 import { Template } from "./models/Template.js";
-import nodemailer from "nodemailer";
+import { transporter } from "./services/emailService.js";
 import rateLimit from "express-rate-limit";
 import helmet from "helmet";
 config();
@@ -41,19 +40,6 @@ sequelize.authenticate()
     process.exit(1);
   });
 
-// Email transporter configuration
-const transporter = nodemailer.createTransport({
-  service: process.env.EMAIL_SERVICE || 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS
-  },
-  pool: true,
-  rateLimit: true,
-  maxConnections: 1,
-  maxMessages: 5
-});
-
 // Verify email configuration
 transporter.verify((error) => {
   if (error) {
@@ -77,6 +63,11 @@ app.disable('x-powered-by');
 // Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/templates", templateRoutes);
+
+// Basic route for testing
+app.get("/", (req, res) => {
+  res.json({ message: "API is running" });
+});
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -106,11 +97,16 @@ app.use((req, res) => {
 });
 
 // Database synchronization
-sequelize.sync({ alter: true }).then(() => {
-  console.log("📦 Database models synchronized");
-}).catch(err => {
-  console.error('❌ Database sync error:', err);
-});
+if (process.env.NODE_ENV === 'development') {
+  sequelize.sync({ force: true }).then(() => {
+    console.log("📦 Database models synchronized (tables recreated)");
+  }).catch(err => {
+    console.error('❌ Database sync error:', err);
+  });
+} else {
+  // In production, don't automatically change schema
+  console.log("📦 Database sync skipped in production mode");
+}
 
 // Start server
 const PORT = process.env.PORT || 5000;

@@ -1,5 +1,5 @@
-import { DataTypes } from "sequelize";
-import sequelize from "../config/database.js";
+import { DataTypes } from 'sequelize';
+import sequelize from '../config/database.js';
 
 const Template = sequelize.define('Template', {
   id: {
@@ -9,52 +9,49 @@ const Template = sequelize.define('Template', {
   },
   userId: {
     type: DataTypes.INTEGER,
-    allowNull: false,
-    field: 'user_id'
+    allowNull: false
   },
   name: {
-    type: DataTypes.STRING(255),
+    type: DataTypes.STRING,
     allowNull: false
   },
   subject: {
-    type: DataTypes.STRING(255),
+    type: DataTypes.STRING,
+    allowNull: false
+  },
+  html: {
+    type: DataTypes.TEXT,
     allowNull: false
   },
   text: {
     type: DataTypes.TEXT,
     allowNull: true
   },
-  html: {
-    type: DataTypes.TEXT,
-    allowNull: false
-  },
-  modifiedDate: {
-    type: DataTypes.DATE,
-    defaultValue: DataTypes.NOW,
-    field: 'modified_date'
-  },
-  envelopeSender: {
-    type: DataTypes.STRING(255),
-    allowNull: true,
-    field: 'envelope_sender'
-  },
   type: {
-    type: DataTypes.STRING(50),
-    allowNull: false,
+    type: DataTypes.STRING,
     defaultValue: 'phishing'
   },
   complexity: {
     type: DataTypes.ENUM('low', 'medium', 'high'),
-    allowNull: false,
     defaultValue: 'medium'
   },
   description: {
     type: DataTypes.TEXT,
     allowNull: true
+  },
+  envelopeSender: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  modifiedDate: {
+    type: DataTypes.DATE,
+    defaultValue: DataTypes.NOW
   }
 }, {
-    tableName: 'templates',
-    timestamps: false
-  });
+  tableName: 'templates',
+  timestamps: true
+});
 
-  export { Template };
+// Add both default and named exports
+export default Template;
+export { Template };

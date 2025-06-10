@@ -1,17 +1,8 @@
-import { Template } from "../models/Template.js";
-import nodemailer from "nodemailer";
+import { Template } from "../models/Template.js";  // Use named import directly
+import { transporter, sendTestEmail } from "../services/emailService.js";
 import { config } from "dotenv";
 
 config();
-
-// Email transporter configuration
-const transporter = nodemailer.createTransport({
-  service: process.env.EMAIL_SERVICE || 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS
-  }
-});
 
 export const createTemplate = async (req, res) => {
   try {
@@ -101,7 +92,8 @@ export const updateTemplate = async (req, res) => {
       text,
       type,
       complexity,
-      description
+      description,
+      modifiedDate: new Date() // Update modification date
     }, {
       where: {
         id: req.params.id,
@@ -158,27 +150,29 @@ export const deleteTemplate = async (req, res) => {
   }
 };
 
-export const sendTestEmail = async (req, res) => {
+export const sendTestEmailHandler = async (req, res) => {
   try {
-    const { email, firstName, lastName, subject, content } = req.body;
+    const { recipientEmail, subject, htmlContent } = req.body;
     
-    if (!email || !subject || !content || !firstName || !lastName) {
+    if (!recipientEmail || !subject || !htmlContent) {
       return res.status(400).json({ 
         success: false,
         message: 'Missing required fields' 
       });
     }
+    
+    const metadata = {
+      type: req.body.type || 'phishing',
+      complexity: req.body.complexity || 'medium'
+    };
 
-    const renderedContent = content
-      .replace(/{{\.FirstName}}/g, firstName)
-      .replace(/{{\.LastName}}/g, lastName)
-      .replace(/{{\.Email}}/g, email);
-
-    await transporter.sendMail({
-      from: process.env.EMAIL_FROM,
-      to: email,
-      subject: `[TEST] ${subject}`,
-      html: renderedContent
+    // Use the service function
+    await sendTestEmail({
+      to: recipientEmail,
+      subject: subject,
+      html: htmlContent,
+      templateName: req.body.name || 'Test Template',
+      metadata: metadata
     });
 
     res.json({ 
@@ -190,6 +184,28 @@ export const sendTestEmail = async (req, res) => {
     res.status(500).json({ 
       success: false,
       message: error.message || 'Failed to send test email'
+    });
+  }
+};
+
+export const healthCheck = async (req, res) => {
+  try {
+    // Count the total number of templates
+    const count = await Template.count();
+    
+    res.json({
+      success: true,
+      message: 'Template API is working correctly',
+      data: {
+        totalTemplates: count,
+        timestamp: new Date().toISOString()
+      }
+    });
+  } catch (error) {
+    console.error('Error in template health check:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Template API health check failed'
     });
   }
 };

@@ -1,5 +1,5 @@
-import { DataTypes } from "sequelize"; // ✅ Correct
-import sequelize from "../config/database.js"; // ✅ Correct
+import { DataTypes } from "sequelize";
+import sequelize from "../config/database.js";
 
 const User = sequelize.define("User", {
   id: {
@@ -7,26 +7,43 @@ const User = sequelize.define("User", {
     autoIncrement: true,
     primaryKey: true,
   },
-  name: {
+  username: {
     type: DataTypes.STRING,
-    allowNull: false,
+    allowNull: true,
   },
   email: {
     type: DataTypes.STRING,
     allowNull: false,
     unique: true,
+    validate: {
+      isEmail: true,
+    },
   },
   password_hash: {
-    type: DataTypes.TEXT,
+    type: DataTypes.STRING,
     allowNull: false,
   },
-  created_at: {
-    type: DataTypes.DATE,
-    defaultValue: DataTypes.NOW,
+  firstName: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  lastName: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  role: {
+    type: DataTypes.ENUM("admin", "user"),
+    defaultValue: "user",
+  },
+  isActive: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: true,
   },
 }, {
-  timestamps: false,
   tableName: "users",
+  timestamps: true,
 });
 
-export default User; // ✅ Correct export for ES Modules
+// Add both default and named exports
+export default User;
+export { User };

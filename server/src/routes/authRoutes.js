@@ -3,15 +3,56 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import dotenv from "dotenv";
-import User from "../models/User.js";
+import sequelize from "../config/database.js";
+import { User } from "../models/User.js"; // Make sure to export User in your User model
 import sendEmail from "../config/email.js";
 import { Sequelize } from "sequelize";
-import sequelize from "../config/database.js";
-import passwordResetTemplate from "../utils/passwordResetTemplate.js"; // ✅ Import Email Template
+import passwordResetTemplate from "../utils/passwordResetTemplate.js";
 
 dotenv.config();
 
 const router = express.Router();
+
+// Register route
+router.post("/register", async (req, res) => {
+  try {
+    const { name, email, password } = req.body;
+
+    // Check if user already exists
+    const userExists = await User.findOne({ where: { email } });
+    if (userExists) {
+      return res.status(400).json({ message: "User with this email already exists" });
+    }
+
+    // Hash password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Create user
+    const newUser = await User.create({
+      username: name, // Assuming your model uses username field
+      email,
+      password_hash: hashedPassword, // Make sure this matches your DB column name
+      firstName: name.split(' ')[0],
+      lastName: name.split(' ').length > 1 ? name.split(' ')[1] : '',
+      role: 'user',
+      isActive: true
+    });
+
+    // Return success but don't include the password hash
+    res.status(201).json({
+      message: "Registration successful! You can now log in.",
+      user: {
+        id: newUser.id,
+        username: newUser.username,
+        email: newUser.email,
+      }
+    });
+  } catch (error) {
+    console.error("Registration error:", error);
+    res.status(500).json({ message: "An error occurred during registration" });
+  }
+});
 
 // ✅ Forgot Password Route (Restored)
 router.post("/forgot-password", async (req, res) => {
