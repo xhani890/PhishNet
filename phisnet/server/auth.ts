@@ -1,7 +1,7 @@
 import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
 import { Express, Request, Response, NextFunction } from "express";
-import express from "express"; // Added missing express import
+import express from "express"; // Add this missing import to fix the error
 import session from "express-session";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
@@ -33,28 +33,24 @@ const scryptAsync = promisify(scrypt);
 const storage_config = multer.diskStorage({
   destination: (req, file, cb) => {
     const uploadDir = path.join(process.cwd(), 'uploads');
-    // Create directory if it doesn't exist
     if (!fs.existsSync(uploadDir)) {
       fs.mkdirSync(uploadDir, { recursive: true });
     }
     cb(null, uploadDir);
   },
   filename: (req, file, cb) => {
-    // Create unique filename with timestamp
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
     const extension = path.extname(file.originalname);
     cb(null, 'profile-' + uniqueSuffix + extension);
   }
 });
 
-// Create multer upload instance with file type validation
 const upload = multer({ 
   storage: storage_config,
   limits: {
-    fileSize: 10 * 1024 * 1024, // Increase to 10MB max size
+    fileSize: 10 * 1024 * 1024,
   },
   fileFilter: (req, file, cb) => {
-    // Accept only images
     const filetypes = /jpeg|jpg|png|gif|webp/;
     const mimetype = filetypes.test(file.mimetype);
     const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
@@ -67,20 +63,12 @@ const upload = multer({
   }
 });
 
-/**
- * Enhanced password hashing with stronger security
- */
 export async function hashPassword(password: string) {
-  // Use a longer salt for better security
   const salt = randomBytes(32).toString("hex");
-  // Increase cost factor with larger buffer
   const buf = (await scryptAsync(password, salt, 64)) as Buffer;
   return `${buf.toString("hex")}.${salt}`;
 }
 
-/**
- * Secure password comparison with timing-safe implementation
- */
 export async function comparePasswords(supplied: string, stored: string) {
   try {
     const [hashed, salt] = stored.split(".");
@@ -95,23 +83,17 @@ export async function comparePasswords(supplied: string, stored: string) {
   }
 }
 
-/**
- * Check if an account is locked or has too many failed attempts
- */
 async function checkAccountLockStatus(user: SelectUser) {
-  // Check if account is locked and if lockout period has expired
   if (user.accountLocked && user.accountLockedUntil) {
     const now = new Date();
     const lockUntil = new Date(user.accountLockedUntil);
     
     if (now < lockUntil) {
-      // Account is still locked
       return {
         locked: true,
         message: `Account is locked. Try again after ${lockUntil.toLocaleString()}`
       };
     } else {
-      // Lockout period expired, reset the lock and counter
       await storage.updateUser(user.id, { 
         accountLocked: false,
         accountLockedUntil: null,
@@ -121,13 +103,11 @@ async function checkAccountLockStatus(user: SelectUser) {
     }
   }
   
-  // Check if failed attempts should be reset (have been a long time ago)
   if (user.lastFailedLogin && user.failedLoginAttempts > 0) {
     const lastAttempt = new Date(user.lastFailedLogin);
     const now = new Date();
     
     if (now.getTime() - lastAttempt.getTime() > RESET_WINDOW) {
-      // Reset counter after window expires
       await storage.updateUser(user.id, {
         failedLoginAttempts: 0
       });
@@ -137,19 +117,14 @@ async function checkAccountLockStatus(user: SelectUser) {
   return { locked: false };
 }
 
-/**
- * Increment failed login attempts and potentially lock account
- */
 async function recordFailedLoginAttempt(user: SelectUser) {
   const newAttemptCount = (user.failedLoginAttempts || 0) + 1;
   
-  // Update user with new attempt count and timestamp
   const updates: Partial<SelectUser> = {
     failedLoginAttempts: newAttemptCount,
     lastFailedLogin: new Date()
   };
   
-  // Lock account if max attempts reached
   if (newAttemptCount >= MAX_LOGIN_ATTEMPTS) {
     const lockUntil = new Date(Date.now() + LOCKOUT_TIME);
     updates.accountLocked = true;
@@ -161,9 +136,6 @@ async function recordFailedLoginAttempt(user: SelectUser) {
   return newAttemptCount >= MAX_LOGIN_ATTEMPTS;
 }
 
-/**
- * Reset failed login attempts after successful login
- */
 async function resetFailedLoginAttempts(userId: number) {
   await storage.updateUser(userId, {
     failedLoginAttempts: 0,
@@ -173,33 +145,30 @@ async function resetFailedLoginAttempts(userId: number) {
   });
 }
 
-/**
- * Sanitize input to prevent SQL injection
- */
 function sanitizeInput(input: string): string {
   if (!input) return '';
   
-  // Remove any SQL command or dangerous characters
   return input
-    .replace(/'/g, "''") // Escape single quotes
-    .replace(/;/g, "") // Remove semicolons
-    .replace(/--/g, "") // Remove SQL comments
-    .replace(/\/\*/g, "") // Remove block comment start
-    .replace(/\*\//g, "") // Remove block comment end
+    .replace(/'/g, "''")
+    .replace(/;/g, "")
+    .replace(/--/g, "")
+    .replace(/\/\*/g, "")
+    .replace(/\*\//g, "")
     .trim();
 }
 
 export function setupAuth(app: Express) {
+  // Configure session with DATABASE-ONLY storage
   const sessionSettings: session.SessionOptions = {
     secret: process.env.SESSION_SECRET || 'phishnet-secret-key',
     resave: false,
     saveUninitialized: false,
-    store: storage.sessionStore,
+    store: storage.sessionStore, // This will be the database session store
     cookie: {
       secure: process.env.NODE_ENV === "production",
-      maxAge: 10 * 60 * 1000, // 10 minutes for security (auto-logout after inactivity)
-      httpOnly: true, // Prevent XSS attacks
-      sameSite: 'lax' // CSRF protection
+      maxAge: 30 * 60 * 1000, // 30 minutes to match TTL
+      httpOnly: true,
+      sameSite: 'lax'
     }
   };
 
@@ -224,6 +193,12 @@ export function setupAuth(app: Express) {
             return done(null, false, { message: "Invalid email or password" });
           }
 
+          // Check if account is locked
+          const lockStatus = await checkAccountLockStatus(user);
+          if (lockStatus.locked) {
+            return done(null, false, { message: lockStatus.message });
+          }
+
           const isValid = await comparePasswords(password, user.password);
           console.log('Password validation result:', isValid);
 
@@ -242,7 +217,6 @@ export function setupAuth(app: Express) {
             });
           }
 
-          // Reset failed attempts on successful login
           await resetFailedLoginAttempts(user.id);
           return done(null, user);
         } catch (error) {
@@ -263,10 +237,9 @@ export function setupAuth(app: Express) {
     }
   });
 
-  // Registration endpoint with strong password validation
+  // Registration endpoint
   app.post("/api/register", async (req, res, next) => {
     try {
-      // Validate user data with strong password rules
       try {
         userValidationSchema.parse(req.body);
       } catch (validationError) {
@@ -278,42 +251,33 @@ export function setupAuth(app: Express) {
         }
       }
 
-      // Sanitize inputs
       const sanitizedEmail = sanitizeInput(req.body.email);
       let sanitizedOrgName = "";
-      let orgId = 0; // Default to 0 (no organization)
+      let orgId = 0;
       
-      // Only process organization if provided
       if (req.body.organizationName && req.body.organizationName.trim() !== '') {
         sanitizedOrgName = sanitizeInput(req.body.organizationName);
       } else {
-        // Set default organization name if not provided or empty string
         sanitizedOrgName = "None";
       }
 
-      // First check if email already exists
       const existingUser = await storage.getUserByEmail(sanitizedEmail);
       if (existingUser) {
         return res.status(400).json({ message: "Email already exists" });
       }
       
-      // Get or create the "None" organization for users without a specific organization
       if (sanitizedOrgName === "None") {
         let noneOrg = await storage.getOrganizationByName("None");
         
         if (!noneOrg) {
-          // Create the None organization if it doesn't exist
           noneOrg = await storage.createOrganization({ name: "None" });
         }
         
         orgId = noneOrg.id;
-      } 
-      // Handle regular organization cases
-      else if (sanitizedOrgName) {
+      } else if (sanitizedOrgName) {
         const organization = await storage.getOrganizationByName(sanitizedOrgName);
         
         if (!organization) {
-          // Create new organization
           const newOrg = await storage.createOrganization({ name: sanitizedOrgName });
           orgId = newOrg.id;
         } else {
@@ -321,30 +285,25 @@ export function setupAuth(app: Express) {
         }
       }
 
-      // Only check existing users if organization provided
       let isFirstUser = false;
       if (orgId > 0) {
         const existingUsers = await storage.listUsers(orgId);
         isFirstUser = existingUsers.length === 0;
       }
       
-      // User is admin if they're the first in their organization and they provided a real org name (not "None")
       const isAdmin = isFirstUser && sanitizedOrgName !== "None" && sanitizedOrgName.length > 0;
       
-      // Create the user associated with the organization if provided
       const user = await storage.createUser({
         ...req.body,
         email: sanitizedEmail,
-        organizationName: sanitizedOrgName || "None", // Default to "None" if not provided
+        organizationName: sanitizedOrgName || "None",
         password: await hashPassword(req.body.password),
         organizationId: orgId,
         isAdmin: isAdmin
       });
 
-      // Remove the password from the response for security
       const { password, ...userWithoutPassword } = user;
 
-      // Don't automatically log in, just return success message
       res.status(201).json({ 
         ...userWithoutPassword,
         message: "User registered successfully. Please log in."
@@ -355,7 +314,7 @@ export function setupAuth(app: Express) {
     }
   });
 
-  // Login with custom error handling
+  // Login endpoint
   app.post("/api/login", (req, res, next) => {
     passport.authenticate("local", (err, user, info) => {
       if (err) {
@@ -371,7 +330,6 @@ export function setupAuth(app: Express) {
           return next(loginErr);
         }
         
-        // Don't send password in response
         const { password, ...userWithoutPassword } = user;
         return res.status(200).json(userWithoutPassword);
       });
@@ -388,7 +346,6 @@ export function setupAuth(app: Express) {
   app.get("/api/user", (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     
-    // Don't send password in response
     const { password, ...userWithoutPassword } = req.user;
     res.json(userWithoutPassword);
   });
@@ -609,11 +566,18 @@ export function setupAuth(app: Express) {
       res.status(500).json({ message: "Failed to change password" });
     }
   });
+  
+  // Add session ping endpoint
+  app.post("/api/session-ping", isAuthenticated, (req, res) => {
+    // This endpoint just checks if user is authenticated
+    // The session is automatically refreshed when accessed
+    res.json({ 
+      message: "Session refreshed",
+      expiresAt: new Date(Date.now() + 30 * 60 * 1000) // 30 minutes from now
+    });
+  });
 }
 
-/**
- * Middleware to check if the user has an associated organization
- */
 export function isAuthenticated(req: Request, res: Response, next: NextFunction) {
   if (!req.isAuthenticated()) {
     return res.status(401).json({ message: "Authentication required" });
@@ -621,9 +585,6 @@ export function isAuthenticated(req: Request, res: Response, next: NextFunction)
   next();
 }
 
-/**
- * Middleware to check if the user has an associated organization
- */
 export function hasOrganization(req: Request, res: Response, next: NextFunction) {
   if (!req.user || !req.user.organizationId) {
     return res.status(403).json({ message: "Organization required" });
@@ -631,9 +592,6 @@ export function hasOrganization(req: Request, res: Response, next: NextFunction)
   next();
 }
 
-/**
- * Middleware to check if user is an admin
- */
 export function isAdmin(req: Request, res: Response, next: NextFunction) {
   if (!req.user || !req.user.isAdmin) {
     return res.status(403).json({ message: "Admin access required" });
@@ -641,12 +599,8 @@ export function isAdmin(req: Request, res: Response, next: NextFunction) {
   next();
 }
 
-/**
- * Middleware to refresh the user's session
- */
 export function refreshSession(req: Request, res: Response, next: NextFunction) {
   if (req.session) {
-    // Reset session expiry
     req.session.touch();
     console.log("Session refreshed for user:", req.user?.email);
   }

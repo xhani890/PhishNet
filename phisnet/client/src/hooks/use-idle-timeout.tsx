@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from './use-auth';
 
-export function useIdleTimeout(timeout = 10 * 60 * 1000) { // 10 minutes in milliseconds
+export function useIdleTimeout(timeout = 30 * 60 * 1000) { // 30 minutes
   const [lastActivity, setLastActivity] = useState<number>(Date.now());
   const [isIdle, setIsIdle] = useState<boolean>(false);
   const { logoutMutation } = useAuth();
@@ -20,7 +20,7 @@ export function useIdleTimeout(timeout = 10 * 60 * 1000) { // 10 minutes in mill
 
     // Add event listeners
     events.forEach(event => {
-      window.addEventListener(event, updateLastActivity);
+      document.addEventListener(event, updateLastActivity, { passive: true });
     });
 
     // Check idle status periodically
@@ -38,7 +38,7 @@ export function useIdleTimeout(timeout = 10 * 60 * 1000) { // 10 minutes in mill
     // Cleanup
     return () => {
       events.forEach(event => {
-        window.removeEventListener(event, updateLastActivity);
+        document.removeEventListener(event, updateLastActivity);
       });
       clearInterval(idleInterval);
     };

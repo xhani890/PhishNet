@@ -1,38 +1,47 @@
-﻿import { users, organizations, groups, targets, smtpProfiles, emailTemplates, landingPages, campaigns, campaignResults, passwordResetTokens } from "@shared/schema";
-import { db } from "./db";
-import { eq, and, count } from "drizzle-orm";
-import session from "express-session";
-import createMemoryStore from "memorystore";
-import connectPg from "connect-pg-simple";
-import { pool } from "./db";
+﻿import { Pool } from 'pg';
+import { drizzle } from 'drizzle-orm/node-postgres';
+import session from 'express-session';
+import ConnectPgSimple from 'connect-pg-simple';
+import { db, pool } from './db';
+import { eq, and, count } from 'drizzle-orm';
+import { 
+  users, 
+  organizations, 
+  groups, 
+  targets, 
+  smtpProfiles, 
+  emailTemplates, 
+  landingPages, 
+  campaigns, 
+  campaignResults, 
+  passwordResetTokens,
+  type User,
+  type Organization,
+  type Group,
+  type Target,
+  type SmtpProfile,
+  type EmailTemplate,
+  type LandingPage,
+  type Campaign,
+  type CampaignResult,
+  type PasswordResetToken,
+  type InsertUser,
+  type InsertOrganization,
+  type InsertGroup,
+  type InsertTarget,
+  type InsertSmtpProfile,
+  type InsertEmailTemplate,
+  type InsertLandingPage,
+  type InsertCampaign,
+  type InsertCampaignResult,
+  type InsertPasswordResetToken
+} from '@shared/schema';
 
-import type { 
-  User,
-  InsertUser, 
-  Organization, 
-  InsertOrganization,
-  Group,
-  InsertGroup,
-  Target,
-  InsertTarget,
-  SmtpProfile,
-  InsertSmtpProfile,
-  EmailTemplate,
-  InsertEmailTemplate,
-  LandingPage,
-  InsertLandingPage,
-  Campaign,
-  InsertCampaign,
-  CampaignResult,
-  InsertCampaignResult,
-  PasswordResetToken
-} from "@shared/schema";
+// Create PostgreSQL session store
+const PostgresSessionStore = ConnectPgSimple(session);
 
-const PostgresSessionStore = connectPg(session);
-const MemoryStore = createMemoryStore(session);
-
-export interface IStorage {
-  // Session store
+// Define interface for storage implementation
+interface IStorage {
   sessionStore: session.Store;
   
   // User methods
@@ -56,7 +65,7 @@ export interface IStorage {
   // Group methods
   getGroup(id: number): Promise<Group | undefined>;
   createGroup(organizationId: number, group: InsertGroup): Promise<Group>;
-  updateGroup(id: number, data: Partial<Group>): Promise<Group | undefined>;  // Fixed this line
+  updateGroup(id: number, data: Partial<Group>): Promise<Group | undefined>;
   deleteGroup(id: number): Promise<boolean>;
   listGroups(organizationId: number): Promise<(Group & { targetCount: number })[]>;
   
@@ -95,9 +104,9 @@ export interface IStorage {
   deleteCampaign(id: number): Promise<boolean>;
   listCampaigns(organizationId: number): Promise<Campaign[]>;
   
-  // Campaign Result methods
+  // Campaign Results methods
   getCampaignResult(id: number): Promise<CampaignResult | undefined>;
-  createCampaignResult(organizationId: number, result: InsertCampaignResult): Promise<CampaignResult>;
+  createCampaignResult(result: InsertCampaignResult): Promise<CampaignResult>;
   updateCampaignResult(id: number, data: Partial<CampaignResult>): Promise<CampaignResult | undefined>;
   listCampaignResults(campaignId: number): Promise<CampaignResult[]>;
   
@@ -109,17 +118,15 @@ export class DatabaseStorage implements IStorage {
   sessionStore: session.Store;
   
   constructor() {
-    if (process.env.DATABASE_URL) {
-      this.sessionStore = new PostgresSessionStore({ 
-        pool, 
-        tableName: 'session',
-        createTableIfMissing: true 
-      });
-    } else {
-      this.sessionStore = new MemoryStore({
-        checkPeriod: 86400000, // prune expired entries every 24h
-      });
-    }
+    // ALWAYS use database session store - no fallback to memory
+    this.sessionStore = new PostgresSessionStore({ 
+      pool, 
+      tableName: 'session',
+      createTableIfMissing: true,
+      ttl: 30 * 60 // 30 minutes in seconds
+    });
+    
+    console.log('Database session store initialized with 30 minute TTL');
   }
   
   // User methods
@@ -696,690 +703,7 @@ export class DatabaseStorage implements IStorage {
   }
 }
 
-export class MemStorage implements IStorage {
-  private users: Map<number, User>;
-  private organizations: Map<number, Organization>;
-  private groups: Map<number, Group>;
-  private targets: Map<number, Target>;
-  private smtpProfiles: Map<number, SmtpProfile>;
-  private emailTemplates: Map<number, EmailTemplate>;
-  private landingPages: Map<number, LandingPage>;
-  private campaigns: Map<number, Campaign>;
-  private campaignResults: Map<number, CampaignResult>;
-  private passwordResetTokens: Map<number, PasswordResetToken>;
-  
-  currentId: number; // Add this line
-  sessionStore: session.SessionStore;
-  
-  constructor() {
-    this.users = new Map();
-    this.organizations = new Map();
-    this.groups = new Map();
-    this.targets = new Map();
-    this.smtpProfiles = new Map();
-    this.emailTemplates = new Map();
-    this.landingPages = new Map();
-    this.campaigns = new Map();
-    this.campaignResults = new Map();
-    this.passwordResetTokens = new Map();
-    
-    this.currentId = 1; // Initialize it here
-    this.sessionStore = new MemoryStore({
-      checkPeriod: 86400000, // prune expired entries every 24h
-    });
-  }
-  
-  // User methods
-  async getUser(id: number): Promise<User | undefined> {
-    return this.users.get(id);
-  }
-  
-  async getUserByEmail(email: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.email.toLowerCase() === email.toLowerCase()
-    );
-  }
-  
-  async createUser(user: InsertUser & { organizationId: number }): Promise<User> {
-    const id = this.currentId++;
-    const now = new Date();
-    const newUser: User = {
-      id,
-      email: user.email,
-      password: user.password,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      isAdmin: user.isAdmin || false,
-      organizationId: user.organizationId,
-      organizationName: user.organizationName,
-      createdAt: now,
-      updatedAt: now
-    };
-    this.users.set(id, newUser);
-    return newUser;
-  }
-  
-  async updateUser(id: number, data: Partial<User>): Promise<User | undefined> {
-    const user = this.users.get(id);
-    if (!user) return undefined;
-    
-    const updatedUser = {
-      ...user,
-      ...data,
-      updatedAt: new Date()
-    };
-    this.users.set(id, updatedUser);
-    return updatedUser;
-  }
-  
-  async deleteUser(id: number): Promise<boolean> {
-    return this.users.delete(id);
-  }
-  
-  async listUsers(organizationId: number): Promise<User[]> {
-    return Array.from(this.users.values()).filter(
-      (user) => user.organizationId === organizationId
-    );
-  }
-  
-  // Password reset methods
-  async createPasswordResetToken(userId: number, token: string, expiresAt: Date): Promise<PasswordResetToken> {
-    const id = this.currentId++;
-    const now = new Date();
-    const newToken = {
-      id,
-      userId,
-      token,
-      expiresAt,
-      used: false,
-      createdAt: now
-    };
-    this.passwordResetTokens.set(id, newToken);
-    return newToken;
-  }
-  
-  async getPasswordResetToken(token: string): Promise<PasswordResetToken | undefined> {
-    return Array.from(this.passwordResetTokens.values()).find(
-      (resetToken) => resetToken.token === token && !resetToken.used
-    );
-  }
-  
-  async markPasswordResetTokenUsed(id: number): Promise<boolean> {
-    const token = this.passwordResetTokens.get(id);
-    if (!token) return false;
-    
-    const updatedToken = {
-      ...token,
-      used: true
-    };
-    this.passwordResetTokens.set(id, updatedToken);
-    return true;
-  }
-  
-  // Organization methods
-  async getOrganization(id: number): Promise<Organization | undefined> {
-    return this.organizations.get(id);
-  }
-  
-  async getOrganizationByName(name: string): Promise<Organization | undefined> {
-    return Array.from(this.organizations.values()).find(
-      (org) => org.name.toLowerCase() === name.toLowerCase()
-    );
-  }
-  
-  async createOrganization(organization: InsertOrganization): Promise<Organization> {
-    const id = this.currentId++;
-    const now = new Date();
-    const newOrg: Organization = {
-      id,
-      name: organization.name,
-      createdAt: now,
-      updatedAt: now
-    };
-    this.organizations.set(id, newOrg);
-    return newOrg;
-  }
-  
-  // Group methods
-  async getGroup(id: number): Promise<Group | undefined> {
-    return this.groups.get(id);
-  }
-  
-  async createGroup(organizationId: number, group: InsertGroup): Promise<Group> {
-    const id = this.currentId++;
-    const now = new Date();
-    const newGroup: Group = {
-      id,
-      name: group.name,
-      description: group.description || null,
-      organizationId,
-      createdAt: now,
-      updatedAt: now
-    };
-    this.groups.set(id, newGroup);
-    return newGroup;
-  }
-  
-  async updateGroup(id: number, data: Partial<Group>): Promise<Group | undefined> {
-    const group = this.groups.get(id);
-    if (!group) return undefined;
-    
-    const updatedGroup = {
-      ...group,
-      ...data,
-      updatedAt: new Date()
-    };
-    this.groups.set(id, updatedGroup);
-    return updatedGroup;
-  }
-  
-  async deleteGroup(id: number): Promise<boolean> {
-    // Delete all targets in the group first
-    for (const [targetId, target] of this.targets.entries()) {
-      if (target.groupId === id) {
-        this.targets.delete(targetId);
-      }
-    }
-    return this.groups.delete(id);
-  }
-  
-  async listGroups(organizationId: number): Promise<(Group & { targetCount: number })[]> {
-    const orgGroups = Array.from(this.groups.values()).filter(
-      (group) => group.organizationId === organizationId
-    );
-    
-    return orgGroups.map(group => {
-      const targetCount = Array.from(this.targets.values()).filter(
-        target => target.groupId === group.id
-      ).length;
-      
-      return {
-        ...group,
-        targetCount
-      };
-    });
-  }
-  
-  // Target methods
-  async getTarget(id: number): Promise<Target | undefined> {
-    return this.targets.get(id);
-  }
-  
-  async createTarget(organizationId: number, groupId: number, target: InsertTarget): Promise<Target> {
-    const id = this.currentId++;
-    const now = new Date();
-    const newTarget: Target = {
-      id,
-      firstName: target.firstName,
-      lastName: target.lastName,
-      email: target.email,
-      position: target.position || null,
-      groupId,
-      organizationId,
-      createdAt: now,
-      updatedAt: now
-    };
-    this.targets.set(id, newTarget);
-    return newTarget;
-  }
-  
-  async updateTarget(id: number, data: Partial<Target>): Promise<Target | undefined> {
-    const [updatedTarget] = await db.update(targets)
-      .set({
-        ...data,
-        updatedAt: new Date(),
-      })
-      .where(eq(targets.id, id))
-      .returning();
-    return updatedTarget;
-  }
-  
-  async deleteTarget(id: number): Promise<boolean> {
-    return this.targets.delete(id);
-  }
-  
-  async listTargets(groupId: number): Promise<Target[]> {
-    return Array.from(this.targets.values()).filter(
-      (target) => target.groupId === groupId
-    );
-  }
-  
-  // SMTP Profile methods
-  async getSmtpProfile(id: number): Promise<SmtpProfile | undefined> {
-    return this.smtpProfiles.get(id);
-  }
-  
-  async createSmtpProfile(organizationId: number, profile: InsertSmtpProfile): Promise<SmtpProfile> {
-    const id = this.currentId++;
-    const now = new Date();
-    const newProfile: SmtpProfile = {
-      id,
-      name: profile.name,
-      host: profile.host,
-      port: profile.port,
-      username: profile.username,
-      password: profile.password,
-      fromName: profile.fromName,
-      fromEmail: profile.fromEmail,
-      organizationId,
-      createdAt: now,
-      updatedAt: now
-    };
-    this.smtpProfiles.set(id, newProfile);
-    return newProfile;
-  }
-  
-  async updateSmtpProfile(id: number, data: Partial<SmtpProfile>): Promise<SmtpProfile | undefined> {
-    const profile = this.smtpProfiles.get(id);
-    if (!profile) return undefined;
-    
-    const updatedProfile = {
-      ...profile,
-      ...data,
-      updatedAt: new Date()
-    };
-    this.smtpProfiles.set(id, updatedProfile);
-    return updatedProfile;
-  }
-  
-  async deleteSmtpProfile(id: number): Promise<boolean> {
-    return this.smtpProfiles.delete(id);
-  }
-  
-  async listSmtpProfiles(organizationId: number): Promise<SmtpProfile[]> {
-    return Array.from(this.smtpProfiles.values()).filter(
-      (profile) => profile.organizationId === organizationId
-    );
-  }
-  
-  // Email Template methods
-  async getEmailTemplate(id: number): Promise<any> {
-    try {
-      // Use raw SQL query through the pool to bypass Drizzle ORM
-      const result = await pool.query(`SELECT * FROM email_templates WHERE id = $1`, [id]);
-      
-      if (result.rows.length === 0) {
-        return undefined;
-      }
-      
-      // Convert to our application model
-      const template = result.rows[0];
-      return {
-        id: template.id,
-        name: template.name,
-        subject: template.subject,
-        htmlContent: template.html_content,
-        textContent: template.text_content,
-        senderName: template.sender_name,
-        senderEmail: template.sender_email,
-        organizationId: template.organization_id,
-        createdAt: template.created_at,
-        updatedAt: template.updated_at,
-        createdById: template.created_by_id
-      };
-    } catch (error) {
-      console.error("Error getting template:", error);
-      return undefined;
-    }
-  }
-  
-  async createEmailTemplate(organizationId: number, userId: number, template: InsertEmailTemplate): Promise<any> {
-    try {
-      // Use raw SQL query through the pool to bypass Drizzle ORM
-      const result = await pool.query(
-        `INSERT INTO email_templates 
-         (name, subject, html_content, text_content, sender_name, sender_email, organization_id, created_by_id) 
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-         RETURNING *`,
-        [
-          template.name,
-          template.subject,
-          template.htmlContent,
-          template.textContent || null,
-          template.senderName,
-          template.senderEmail,
-          organizationId,
-          userId
-        ]
-      );
-      
-      if (result.rows.length === 0) {
-        throw new Error("Failed to create template");
-      }
-      
-      // Map the DB result back to our application model
-      const dbTemplate = result.rows[0];
-      return {
-        id: dbTemplate.id,
-        name: dbTemplate.name,
-        subject: dbTemplate.subject,
-        htmlContent: dbTemplate.html_content,
-        textContent: dbTemplate.text_content,
-        senderName: dbTemplate.sender_name,
-        senderEmail: dbTemplate.sender_email,
-        organizationId: dbTemplate.organization_id,
-        createdAt: dbTemplate.created_at,
-        updatedAt: dbTemplate.updated_at,
-        createdById: dbTemplate.created_by_id,
-        type: template.type || null,
-        complexity: template.complexity || null,
-        description: template.description || null,
-        category: template.category || null
-      };
-    } catch (error) {
-      console.error("Error creating template:", error);
-      throw error;
-    }
-  }
-  
-  async updateEmailTemplate(id: number, data: Partial<EmailTemplate>): Promise<any> {
-    try {
-      // First get the existing template to make sure it exists
-      const templateResult = await pool.query(`SELECT * FROM email_templates WHERE id = $1`, [id]);
-      if (templateResult.rows.length === 0) {
-        return undefined;
-      }
-      
-      // Update the template with new data
-      const updateFields = [];
-      const params = [];
-      let paramCounter = 1;
-      
-      if (data.name) {
-        updateFields.push(`name = $${paramCounter}`);
-        params.push(data.name);
-        paramCounter++;
-      }
-      
-      if (data.subject) {
-        updateFields.push(`subject = $${paramCounter}`);
-        params.push(data.subject);
-        paramCounter++;
-      }
-      
-      if (data.textContent !== undefined) {
-        updateFields.push(`text_content = $${paramCounter}`);
-        params.push(data.textContent || null);
-        paramCounter++;
-      }
-      
-      if (data.htmlContent) {
-        updateFields.push(`html_content = $${paramCounter}`);
-        params.push(data.htmlContent);
-        paramCounter++;
-      }
-      
-      if (data.senderName) {
-        updateFields.push(`sender_name = $${paramCounter}`);
-        params.push(data.senderName);
-        paramCounter++;
-      }
-      
-      if (data.senderEmail) {
-        updateFields.push(`sender_email = $${paramCounter}`);
-        params.push(data.senderEmail);
-        paramCounter++;
-      }
-      
-      // Add updated_at timestamp
-      updateFields.push(`updated_at = $${paramCounter}`);
-      params.push(new Date());
-      paramCounter++;
-      
-      // Add the id as the last parameter
-      params.push(id);
-      
-      // Execute the update
-      const result = await pool.query(
-        `UPDATE email_templates SET ${updateFields.join(', ')} WHERE id = $${paramCounter} RETURNING *`,
-        params
-      );
-      
-      if (result.rows.length === 0) {
-        return undefined;
-      }
-      
-      // Map the database result to our application model
-      const dbTemplate = result.rows[0];
-      return {
-        id: dbTemplate.id,
-        name: dbTemplate.name,
-        subject: dbTemplate.subject,
-        html_content: dbTemplate.html_content,
-        text_content: dbTemplate.text_content,
-        sender_name: dbTemplate.sender_name,
-        sender_email: dbTemplate.sender_email,
-        organization_id: dbTemplate.organization_id,
-        created_at: dbTemplate.created_at,
-        updated_at: dbTemplate.updated_at,
-        created_by_id: dbTemplate.created_by_id,
-        type: data.type || null,
-        complexity: data.complexity || null,
-        description: data.description || null,
-        category: data.category || null
-      };
-    } catch (error) {
-      console.error("Error updating template:", error);
-      return undefined;
-    }
-  }
-  
-  async deleteEmailTemplate(id: number): Promise<boolean> {
-    try {
-      // Use raw SQL query through the pool to delete the template
-      const result = await pool.query(`DELETE FROM email_templates WHERE id = $1 RETURNING id`, [id]);
-      
-      // If a row was deleted (returned), the delete was successful
-      return result.rows.length > 0;
-    } catch (error) {
-      console.error("Error deleting template:", error);
-      return false;
-    }
-  }
-  
-  async listEmailTemplates(organizationId: number): Promise<any[]> {
-    try {
-      // Use raw SQL query through the pool to bypass Drizzle ORM
-      const result = await pool.query(`SELECT * FROM email_templates WHERE organization_id = $1`, [organizationId]);
-      
-      // Map the database result to our application model
-      return result.rows.map(template => ({
-        id: template.id,
-        name: template.name,
-        subject: template.subject,
-        htmlContent: template.html_content,
-        textContent: template.text_content,
-        senderName: template.sender_name,
-        senderEmail: template.sender_email,
-        organizationId: template.organization_id,
-        createdAt: template.created_at,
-        updatedAt: template.updated_at,
-        createdById: template.created_by_id
-      }));
-    } catch (error) {
-      console.error("Error listing templates:", error);
-      return [];
-    }
-  }
-  
-  // Landing Page methods
-  async getLandingPage(id: number): Promise<LandingPage | undefined> {
-    return this.landingPages.get(id);
-  }
-  
-  async createLandingPage(organizationId: number, userId: number, page: InsertLandingPage): Promise<LandingPage> {
-    const id = this.currentId++;
-    const now = new Date();
-    const newPage: LandingPage = {
-      id,
-      name: page.name,
-      description: page.description || null,
-      htmlContent: page.htmlContent,
-      redirectUrl: page.redirectUrl || null,
-      pageType: page.pageType,
-      thumbnail: page.thumbnail || null,
-      organizationId,
-      createdById: userId,
-      createdAt: now,
-      updatedAt: now
-    };
-    this.landingPages.set(id, newPage);
-    return newPage;
-  }
-  
-  async updateLandingPage(id: number, data: Partial<LandingPage>): Promise<LandingPage | undefined> {
-    const page = this.landingPages.get(id);
-    if (!page) return undefined;
-    
-    const updatedPage = {
-      ...page,
-      ...data,
-      updatedAt: new Date()
-    };
-    this.landingPages.set(id, updatedPage);
-    return updatedPage;
-  }
-  
-  async deleteLandingPage(id: number): Promise<boolean> {
-    return this.landingPages.delete(id);
-  }
-  
-  async listLandingPages(organizationId: number): Promise<LandingPage[]> {
-    return Array.from(this.landingPages.values()).filter(
-      (page) => page.organizationId === organizationId
-    );
-  }
-  
-  // Campaign methods
-  async getCampaign(id: number): Promise<Campaign | undefined> {
-    return this.campaigns.get(id);
-  }
-  
-  async createCampaign(organizationId: number, userId: number, campaign: InsertCampaign): Promise<Campaign> {
-    const id = this.currentId++;
-    const now = new Date();
-    const newCampaign: Campaign = {
-      id,
-      name: campaign.name,
-      status: "Draft",
-      targetGroupId: Number(campaign.targetGroupId),
-      smtpProfileId: Number(campaign.smtpProfileId),
-      emailTemplateId: Number(campaign.emailTemplateId),
-      landingPageId: Number(campaign.landingPageId),
-      scheduledAt: campaign.scheduledAt ? new Date(campaign.scheduledAt) : null,
-      endDate: campaign.endDate ? new Date(campaign.endDate) : null,
-      createdById: userId,
-      organizationId,
-      createdAt: now,
-      updatedAt: now
-    };
-    this.campaigns.set(id, newCampaign);
-    return newCampaign;
-  }
-  
-  async updateCampaign(id: number, data: Partial<Campaign>): Promise<Campaign | undefined> {
-    const [updatedCampaign] = await db.update(campaigns)
-      .set({
-        ...data,
-        updatedAt: new Date(),
-      })
-      .where(eq(campaigns.id, id))
-      .returning();
-    return updatedCampaign;
-  }
-  
-  async deleteCampaign(id: number): Promise<boolean> {
-    // Delete all results associated with this campaign
-    for (const [resultId, result] of this.campaignResults.entries()) {
-      if (result.campaignId === id) {
-        this.campaignResults.delete(resultId);
-      }
-    }
-    return this.campaigns.delete(id);
-  }
-  
-  async listCampaigns(organizationId: number): Promise<Campaign[]> {
-    return Array.from(this.campaigns.values()).filter(
-      (campaign) => campaign.organizationId === organizationId
-    );
-  }
-  
-  // Campaign Result methods
-  async getCampaignResult(id: number): Promise<CampaignResult | undefined> {
-    return this.campaignResults.get(id);
-  }
-  
-  async createCampaignResult(organizationId: number, result: InsertCampaignResult): Promise<CampaignResult> {
-    const id = this.currentId++;
-    const now = new Date();
-    const newResult: CampaignResult = {
-      id,
-      campaignId: result.campaignId,
-      targetId: result.targetId,
-      sent: result.sent || false,
-      sentAt: result.sentAt || null,
-      opened: result.opened || false,
-      openedAt: result.openedAt || null,
-      clicked: result.clicked || false,
-      clickedAt: result.clickedAt || null,
-      submitted: result.submitted || false,
-      submittedAt: result.submittedAt || null,
-      submittedData: result.submittedData || null,
-      organizationId,
-      createdAt: now,
-      updatedAt: now
-    };
-    this.campaignResults.set(id, newResult);
-    return newResult;
-  }
-  
-  async updateCampaignResult(id: number, data: Partial<CampaignResult>): Promise<CampaignResult | undefined> {
-    const [updatedResult] = await db.update(campaignResults)
-      .set({
-        ...data,
-        updatedAt: new Date(),
-      })
-      .where(eq(campaignResults.id, id))
-      .returning();
-    return updatedResult;
-  }
-  
-  async listCampaignResults(campaignId: number): Promise<CampaignResult[]> {
-    return Array.from(this.campaignResults.values()).filter(
-      (result) => result.campaignId === campaignId
-    );
-  }
-  
-  // Dashboard methods
-  async getDashboardStats(organizationId: number): Promise<any> {
-    // Count active campaigns
-    const activeCampaigns = Array.from(this.campaigns.values()).filter(
-      campaign => campaign.organizationId === organizationId && campaign.status === "Active"
-    ).length;
-    
-    // Count users
-    const userCount = Array.from(this.users.values()).filter(
-      user => user.organizationId === organizationId
-    ).length;
-    
-    // In a real implementation, you would calculate more detailed metrics
-    // For now, we'll return a simple mock data
-    
-    return {
-      activeCampaigns,
-      campaignChange: 12, // Mock data
-      successRate: 32.8, // Mock data
-      successRateChange: 5.2, // Mock data
-      totalUsers: userCount,
-      newUsers: 3, // Mock data
-      trainingCompletion: 78, // Mock data
-      trainingCompletionChange: 8, // Mock data
-    };
-  }
-}
-
-export const storage = process.env.DATABASE_URL 
-  ? new DatabaseStorage() 
-  : new MemStorage();
+// Export singleton instance
+export const storage = new DatabaseStorage();
 
 

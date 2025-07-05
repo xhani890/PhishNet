@@ -1,7 +1,7 @@
 import { refreshSession } from "./queryClient";
 
-// Session timeout in milliseconds (8 hours)
-export const SESSION_TIMEOUT = 8 * 60 * 60 * 1000;
+// Session timeout in milliseconds (30 minutes to match server)
+export const SESSION_TIMEOUT = 30 * 60 * 1000;
 
 // Event for communicating with components
 export const SESSION_EVENTS = {
@@ -10,13 +10,13 @@ export const SESSION_EVENTS = {
 };
 
 let activityTimer: NodeJS.Timeout | null = null;
+let warningTimer: NodeJS.Timeout | null = null;
 let lastActivityTime: number = Date.now();
 let warningEmitted: boolean = false;
 let isAuthenticated = true;
 
-// Create custom events
-const timeoutWarningEvent = new Event(SESSION_EVENTS.TIMEOUT_WARNING);
-const sessionExpiredEvent = new Event(SESSION_EVENTS.SESSION_EXPIRED);
+// Time before session expiration to show warning (5 minutes before)
+const WARNING_BEFORE_TIMEOUT = 5 * 60 * 1000;
 
 /**
  * Tracks user activity and refreshes the session
@@ -27,74 +27,115 @@ export function trackActivity() {
   lastActivityTime = Date.now();
   warningEmitted = false;
   
-  // Reset timer on activity
+  // Clear existing timers
   if (activityTimer) {
     clearTimeout(activityTimer);
   }
+  if (warningTimer) {
+    clearTimeout(warningTimer);
+  }
   
-  // Set new timer for session timeout
+  // Set warning timer (25 minutes after activity)
+  warningTimer = setTimeout(() => {
+    if (!warningEmitted && isAuthenticated) {
+      warningEmitted = true;
+      const warningEvent = new CustomEvent(SESSION_EVENTS.TIMEOUT_WARNING, {
+        detail: { timeRemaining: WARNING_BEFORE_TIMEOUT }
+      });
+      document.dispatchEvent(warningEvent);
+    }
+  }, SESSION_TIMEOUT - WARNING_BEFORE_TIMEOUT);
+  
+  // Set session expiration timer (30 minutes after activity)
   activityTimer = setTimeout(() => {
-    // Emit session expired event
-    document.dispatchEvent(sessionExpiredEvent);
-    // Force logout
-    window.location.href = '/auth';
+    if (isAuthenticated) {
+      // Emit session expired event
+      const expiredEvent = new Event(SESSION_EVENTS.SESSION_EXPIRED);
+      document.dispatchEvent(expiredEvent);
+      // Force logout after a short delay
+      setTimeout(() => {
+        window.location.href = '/auth';
+      }, 1000);
+    }
   }, SESSION_TIMEOUT);
   
-  // Ping server to refresh session
-  refreshSession();
+  // Ping server to refresh session (but not too frequently)
+  const now = Date.now();
+  const lastPing = sessionStorage.getItem('lastSessionPing');
+  if (!lastPing || now - parseInt(lastPing) > 5 * 60 * 1000) { // 5 minutes
+    refreshSession();
+  }
 }
 
 /**
- * Function to manually logout user
- */
-export function forceLogout() {
-  isAuthenticated = false;
-  window.location.href = '/auth';
-}
-
-/**
- * Initializes the session activity tracking
+ * Initialize session management
  */
 export function initSessionManager() {
-  // Set up event listeners to track user activity
-  const activityEvents = [
-    'mousedown', 'mousemove', 'keydown',
-    'scroll', 'touchstart', 'click', 'keypress'
+  isAuthenticated = true;
+  
+  // Events to track user activity
+  const events = [
+    'mousedown', 'mousemove', 'keypress', 
+    'scroll', 'touchstart', 'click', 'keydown'
   ];
   
-  activityEvents.forEach(event => {
-    document.addEventListener(event, () => trackActivity(), false);
+  // Add event listeners with throttling
+  let throttleTimer: NodeJS.Timeout | null = null;
+  const throttledTrackActivity = () => {
+    if (throttleTimer) return;
+    throttleTimer = setTimeout(() => {
+      trackActivity();
+      throttleTimer = null;
+    }, 1000); // Throttle to once per second
+  };
+  
+  events.forEach(event => {
+    document.addEventListener(event, throttledTrackActivity, { passive: true });
   });
   
-  // Set a timer to check for inactivity and emit warning before timeout
-  setInterval(() => {
-    const currentTime = Date.now();
-    const inactiveTime = currentTime - lastActivityTime;
-    
-    // Only refresh session every 15 minutes of activity to reduce server load
-    if (inactiveTime < 15 * 60 * 1000) {  // Less than 15 minutes of inactivity
-      refreshSession();
-    }
-    
-    const timeUntilTimeout = SESSION_TIMEOUT - inactiveTime;
-    
-    // If we're within the warning period (5 minutes) and haven't emitted a warning yet
-    if (timeUntilTimeout <= 5 * 60 * 1000 && timeUntilTimeout > 0 && !warningEmitted) {
-      warningEmitted = true;
-      document.dispatchEvent(timeoutWarningEvent);
-    }
-  }, 60000); // Check every minute instead of every 10 seconds
-  
-  // Initial tracking
+  // Initialize first activity tracking
   trackActivity();
 }
 
 /**
- * Cleans up session manager when component unmounts
+ * Cleanup session management
  */
 export function cleanupSessionManager() {
+  isAuthenticated = false;
+  
+  // Clear timers
   if (activityTimer) {
     clearTimeout(activityTimer);
     activityTimer = null;
   }
+  if (warningTimer) {
+    clearTimeout(warningTimer);
+    warningTimer = null;
+  }
+  
+  // Remove event listeners
+  const events = [
+    'mousedown', 'mousemove', 'keypress', 
+    'scroll', 'touchstart', 'click', 'keydown'
+  ];
+  
+  events.forEach(event => {
+    document.removeEventListener(event, trackActivity);
+  });
+}
+
+/**
+ * Force logout and cleanup
+ */
+export function forceLogout() {
+  cleanupSessionManager();
+  window.location.href = '/auth';
+}
+
+/**
+ * Extend session when user chooses to continue
+ */
+export function extendSession() {
+  warningEmitted = false;
+  trackActivity();
 }

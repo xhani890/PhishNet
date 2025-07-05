@@ -1,37 +1,12 @@
 import express, { type Request, Response, NextFunction } from "express";
-import session from "express-session";
-import FileStore from "session-file-store";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
-import { isAuthenticated, hasOrganization, isAdmin } from './auth';  // Add isAdmin import here
-import { pool } from './db';  // Also import pool for the database query
+import { isAuthenticated, hasOrganization, isAdmin } from './auth';
+import { pool } from './db';
 
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
-
-// Initialize the FileStore with the session
-const SessionFileStore = FileStore(session);
-
-// Configure session middleware
-app.use(
-  session({
-    name: "phishnet.sid",
-    secret: process.env.SESSION_SECRET || "super-secret-key",
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      secure: process.env.NODE_ENV === "production",
-      httpOnly: true,
-      maxAge: 8 * 60 * 60 * 1000, // 8 hours instead of 10 minutes
-      sameSite: "lax"
-    },
-    store: new SessionFileStore({
-      path: "./sessions",
-      ttl: 8 * 60 * 60 // 8 hours in seconds
-    })
-  })
-);
 
 app.use((req, res, next) => {
   const start = Date.now();
@@ -74,16 +49,12 @@ app.use((req, res, next) => {
     throw err;
   });
 
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
   if (app.get("env") === "development") {
     await setupVite(app, server);
   } else {
     serveStatic(app);
   }
 
-  // Change the server.listen configuration
   const port = 5000;
   server.listen(port, "localhost", () => {
     log(`Server running at http://localhost:${port}`);
@@ -93,10 +64,10 @@ app.use((req, res, next) => {
 // Debug endpoint
 app.get("/api/debug/templates", isAuthenticated, isAdmin, async (req, res) => {
   try {
-    // Get all templates with organization IDs
-    const result = await pool.query(`SELECT id, name, organization_id FROM email_templates`);
+    const result = await pool.query('SELECT * FROM email_templates LIMIT 10');
     res.json(result.rows);
   } catch (error) {
-    res.status(500).json({ message: "Error fetching debug data" });
+    console.error('Debug query error:', error);
+    res.status(500).json({ error: 'Database query failed' });
   }
 });
