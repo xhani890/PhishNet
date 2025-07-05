@@ -35,3 +35,10 @@ postcss.config.js
 README.md
 eslint.config.js
 vite.config.js
+
+# Remove sessions directory since we're using database sessions
+# sessions/
+
+# Keep uploads directory but ignore contents
+uploads/*
+!uploads/.gitkeep
