@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated, isAdmin, hasOrganization, hashPassword, comparePasswords, refreshSession } from "./auth";
-import { db } from "./db";
+import { db, pool } from "./db"; // Add pool import here
 import { eq } from "drizzle-orm";
 import multer from "multer";
 import Papa from "papaparse";
@@ -13,6 +13,9 @@ import { z } from "zod";
 const upload = multer({ storage: multer.memoryStorage() });
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Create HTTP server first
+  const server = createServer(app);
+  
   // Setup authentication
   setupAuth(app);
 
@@ -416,7 +419,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         {
           name: validatedData.name,
           subject: validatedData.subject,
-          // Fix the field mapping - add this line:
           htmlContent: validatedData.html_content || validatedData.htmlContent || "<div>Default content</div>",
           textContent: validatedData.text_content || validatedData.textContent,
           senderName: validatedData.sender_name || validatedData.senderName,
@@ -650,11 +652,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/campaigns", isAuthenticated, hasOrganization, async (req, res) => {
     try {
       console.log("Campaign creation request body:", req.body);
+      console.log("User organization ID:", req.user.organizationId);
       
-      // Attempt to validate the data
+      // Create a custom validation schema that accepts strings for dates
+      const campaignValidationSchema = z.object({
+        name: z.string().min(1, "Campaign name is required"),
+        targetGroupId: z.number().or(z.string().transform(val => parseInt(val))),
+        smtpProfileId: z.number().or(z.string().transform(val => parseInt(val))),
+        emailTemplateId: z.number().or(z.string().transform(val => parseInt(val))),
+        landingPageId: z.number().or(z.string().transform(val => parseInt(val))),
+        scheduledAt: z.string().optional().nullable().or(z.literal('')),
+        endDate: z.string().optional().nullable().or(z.literal('')),
+      });
+      
+      // Attempt to validate the data with the custom schema
       let validatedData;
       try {
-        validatedData = insertCampaignSchema.parse(req.body);
+        validatedData = campaignValidationSchema.parse(req.body);
       } catch (validationError) {
         if (validationError instanceof z.ZodError) {
           console.error("Campaign validation errors:", validationError.errors);
@@ -666,43 +680,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
         throw validationError;
       }
       
+      console.log("Validated data:", validatedData);
+      
       // Validate that referenced objects exist and belong to user's organization
       const targetGroup = await storage.getGroup(Number(validatedData.targetGroupId));
+      console.log("Target group found:", targetGroup ? `ID ${targetGroup.id}, Org ${targetGroup.organizationId}` : "NOT FOUND");
       if (!targetGroup || targetGroup.organizationId !== req.user.organizationId) {
         return res.status(400).json({ message: "Invalid target group" });
       }
       
       const smtpProfile = await storage.getSmtpProfile(Number(validatedData.smtpProfileId));
+      console.log("SMTP profile found:", smtpProfile ? `ID ${smtpProfile.id}, Org ${smtpProfile.organizationId}` : "NOT FOUND");
       if (!smtpProfile || smtpProfile.organizationId !== req.user.organizationId) {
         return res.status(400).json({ message: "Invalid SMTP profile" });
       }
       
       const emailTemplate = await storage.getEmailTemplate(Number(validatedData.emailTemplateId));
-      if (!emailTemplate || emailTemplate.organizationId !== req.user.organizationId) {
-        return res.status(400).json({ message: "Invalid email template" });
+      console.log("Email template found:", emailTemplate ? `ID ${emailTemplate.id}, Org ${emailTemplate.organizationId}` : "NOT FOUND");
+      if (!emailTemplate) {
+        return res.status(400).json({ message: "Email template not found" });
+      }
+      if (emailTemplate.organizationId !== req.user.organizationId) {
+        console.log(`Email template organization mismatch: Template org ${emailTemplate.organizationId}, User org ${req.user.organizationId}`);
+        return res.status(400).json({ message: "Invalid email template - organization mismatch" });
       }
       
       const landingPage = await storage.getLandingPage(Number(validatedData.landingPageId));
+      console.log("Landing page found:", landingPage ? `ID ${landingPage.id}, Org ${landingPage.organizationId}` : "NOT FOUND");
       if (!landingPage || landingPage.organizationId !== req.user.organizationId) {
         return res.status(400).json({ message: "Invalid landing page" });
       }
       
-      // Create the campaign
+      // Convert string dates to Date objects or null
+      const scheduledAt = validatedData.scheduledAt && validatedData.scheduledAt !== "" 
+        ? new Date(validatedData.scheduledAt) 
+        : null;
+      const endDate = validatedData.endDate && validatedData.endDate !== "" 
+        ? new Date(validatedData.endDate) 
+        : null;
+      
+      console.log("All validations passed, creating campaign...");
+      
+      // Create the campaign with properly formatted data
       const campaign = await storage.createCampaign(
         req.user.organizationId, 
         req.user.id, 
         {
-          ...validatedData,
-          // Ensure proper type conversion
+          name: validatedData.name,
           targetGroupId: Number(validatedData.targetGroupId),
           smtpProfileId: Number(validatedData.smtpProfileId),
           emailTemplateId: Number(validatedData.emailTemplateId),
           landingPageId: Number(validatedData.landingPageId),
-          scheduledAt: validatedData.scheduledAt || null,
-          endDate: validatedData.endDate || null,
+          scheduledAt,
+          endDate,
         }
       );
       
+      console.log("Campaign created successfully:", campaign);
       res.status(201).json(campaign);
     } catch (error) {
       console.error("Campaign creation error:", error);
@@ -716,275 +750,200 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Add or update these campaign routes
-
   // Get a specific campaign by ID
   app.get("/api/campaigns/:id", isAuthenticated, hasOrganization, async (req, res) => {
     try {
       const campaignId = parseInt(req.params.id, 10);
+      console.log(`Fetching campaign with ID: ${campaignId} for org: ${req.user.organizationId}`);
+      
+      if (isNaN(campaignId)) {
+        return res.status(400).json({ message: "Invalid campaign ID" });
+      }
+      
       const campaign = await storage.getCampaign(campaignId);
       
-      if (!campaign || campaign.organizationId !== req.user.organizationId) {
+      if (!campaign) {
+        console.log(`Campaign not found for ID: ${campaignId}`);
         return res.status(404).json({ message: "Campaign not found" });
       }
       
-      // Get related data
-      const group = await storage.getGroup(campaign.targetGroupId);
-      const template = await storage.getEmailTemplate(campaign.emailTemplateId);
-      const landingPage = await storage.getLandingPage(campaign.landingPageId);
-      const smtpProfile = await storage.getSmtpProfile(campaign.smtpProfileId);
-      const targets = await storage.listTargets(campaign.targetGroupId);
+      if (campaign.organizationId !== req.user.organizationId) {
+        console.log(`Access denied for campaign ID: ${campaignId}. Campaign org: ${campaign.organizationId}, User org: ${req.user.organizationId}`);
+        return res.status(403).json({ message: "Access denied" });
+      }
       
-      // Get campaign results
-      const results = await storage.listCampaignResults(campaignId);
-      
-      // Calculate metrics
-      const sentCount = results.filter(r => r.sent).length;
-      const openedCount = results.filter(r => r.opened).length;
-      const clickedCount = results.filter(r => r.clicked).length;
-      
-      const enrichedCampaign = {
-        ...campaign,
-        targetGroup: group?.name,
-        emailTemplate: template ? { id: template.id, name: template.name } : null,
-        landingPage: landingPage ? { id: landingPage.id, name: landingPage.name } : null,
-        smtpProfile: smtpProfile ? { id: smtpProfile.id, name: smtpProfile.name } : null,
-        totalTargets: targets.length,
-        sentCount,
-        openRate: sentCount > 0 ? Math.round((openedCount / sentCount) * 100) : 0,
-        clickRate: openedCount > 0 ? Math.round((clickedCount / openedCount) * 100) : 0,
-      };
-      
-      res.json(enrichedCampaign);
+      console.log(`Campaign found and returning:`, campaign);
+      res.json(campaign);
     } catch (error) {
       console.error("Error fetching campaign:", error);
       res.status(500).json({ message: "Error fetching campaign" });
     }
   });
 
-  // Update a campaign
-  app.put("/api/campaigns/:id", isAuthenticated, hasOrganization, async (req, res) => {
-    try {
-      const campaignId = parseInt(req.params.id, 10);
-      const campaign = await storage.getCampaign(campaignId);
-      
-      if (!campaign || campaign.organizationId !== req.user.organizationId) {
-        return res.status(404).json({ message: "Campaign not found" });
-      }
-      
-      const validatedData = insertCampaignSchema.parse(req.body);
-      
-      // Validate that referenced objects exist and belong to user's organization
-      const targetGroup = await storage.getGroup(Number(validatedData.targetGroupId));
-      if (!targetGroup || targetGroup.organizationId !== req.user.organizationId) {
-        return res.status(400).json({ message: "Invalid target group" });
-      }
-      
-      const smtpProfile = await storage.getSmtpProfile(Number(validatedData.smtpProfileId));
-      if (!smtpProfile || smtpProfile.organizationId !== req.user.organizationId) {
-        return res.status(400).json({ message: "Invalid SMTP profile" });
-      }
-      
-      const emailTemplate = await storage.getEmailTemplate(Number(validatedData.emailTemplateId));
-      if (!emailTemplate || emailTemplate.organizationId !== req.user.organizationId) {
-        return res.status(400).json({ message: "Invalid email template" });
-      }
-      
-      const landingPage = await storage.getLandingPage(Number(validatedData.landingPageId));
-      if (!landingPage || landingPage.organizationId !== req.user.organizationId) {
-        return res.status(400).json({ message: "Invalid landing page" });
-      }
-      
-      const updatedCampaign = await storage.updateCampaign(campaignId, {
-        name: validatedData.name,
-        targetGroupId: Number(validatedData.targetGroupId),
-        smtpProfileId: Number(validatedData.smtpProfileId),
-        emailTemplateId: Number(validatedData.emailTemplateId),
-        landingPageId: Number(validatedData.landingPageId),
-        scheduledAt: validatedData.scheduledAt ? new Date(validatedData.scheduledAt) : null,
-        endDate: validatedData.endDate ? new Date(validatedData.endDate) : null,
+  // Update a specific campaign by ID
+app.put("/api/campaigns/:id", isAuthenticated, hasOrganization, async (req, res) => {
+  try {
+    const campaignId = parseInt(req.params.id, 10);
+    const campaign = await storage.getCampaign(campaignId);
+    
+    if (!campaign || campaign.organizationId !== req.user.organizationId) {
+      return res.status(404).json({ message: "Campaign not found" });
+    }
+    
+    // Create a custom validation schema that accepts strings for dates
+    const campaignValidationSchema = z.object({
+      name: z.string().min(1, "Campaign name is required"),
+      targetGroupId: z.number().or(z.string().transform(val => parseInt(val))),
+      smtpProfileId: z.number().or(z.string().transform(val => parseInt(val))),
+      emailTemplateId: z.number().or(z.string().transform(val => parseInt(val))),
+      landingPageId: z.number().or(z.string().transform(val => parseInt(val))),
+      scheduledAt: z.string().optional().nullable().or(z.literal('')),
+      endDate: z.string().optional().nullable().or(z.literal('')),
+    });
+    
+    const validatedData = campaignValidationSchema.parse(req.body);
+    
+    // Validate that referenced objects exist and belong to user's organization
+    const targetGroup = await storage.getGroup(Number(validatedData.targetGroupId));
+    if (!targetGroup || targetGroup.organizationId !== req.user.organizationId) {
+      return res.status(400).json({ message: "Invalid target group" });
+    }
+    
+    const smtpProfile = await storage.getSmtpProfile(Number(validatedData.smtpProfileId));
+    if (!smtpProfile || smtpProfile.organizationId !== req.user.organizationId) {
+      return res.status(400).json({ message: "Invalid SMTP profile" });
+    }
+    
+    const emailTemplate = await storage.getEmailTemplate(Number(validatedData.emailTemplateId));
+    if (!emailTemplate || emailTemplate.organizationId !== req.user.organizationId) {
+      return res.status(400).json({ message: "Invalid email template" });
+    }
+    
+    const landingPage = await storage.getLandingPage(Number(validatedData.landingPageId));
+    if (!landingPage || landingPage.organizationId !== req.user.organizationId) {
+      return res.status(400).json({ message: "Invalid landing page" });
+    }
+    
+    // Convert string dates to Date objects or null
+    const scheduledAt = validatedData.scheduledAt && validatedData.scheduledAt !== "" 
+      ? new Date(validatedData.scheduledAt) 
+      : null;
+    const endDate = validatedData.endDate && validatedData.endDate !== "" 
+      ? new Date(validatedData.endDate) 
+      : null;
+    
+    const updatedCampaign = await storage.updateCampaign(campaignId, {
+      name: validatedData.name,
+      targetGroupId: Number(validatedData.targetGroupId),
+      smtpProfileId: Number(validatedData.smtpProfileId),
+      emailTemplateId: Number(validatedData.emailTemplateId),
+      landingPageId: Number(validatedData.landingPageId),
+      scheduledAt,
+      endDate,
+    });
+    
+    res.json(updatedCampaign);
+  } catch (error) {
+    console.error("Error updating campaign:", error);
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ 
+        message: "Validation error", 
+        errors: error.errors 
       });
-      
-      res.json(updatedCampaign);
-    } catch (error) {
-      console.error("Error updating campaign:", error);
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ 
-          message: "Validation error", 
-          errors: error.errors 
-        });
-      }
-      res.status(500).json({ message: "Error updating campaign" });
     }
-  });
+    res.status(500).json({ message: "Error updating campaign" });
+  }
+});
 
-  // Delete a campaign
-  app.delete("/api/campaigns/:id", isAuthenticated, hasOrganization, async (req, res) => {
-    try {
-      const campaignId = parseInt(req.params.id, 10);
-      const campaign = await storage.getCampaign(campaignId);
-      
-      if (!campaign || campaign.organizationId !== req.user.organizationId) {
-        return res.status(404).json({ message: "Campaign not found" });
-      }
-      
-      await storage.deleteCampaign(campaignId);
-      res.json({ success: true });
-    } catch (error) {
-      console.error("Error deleting campaign:", error);
-      res.status(500).json({ message: "Error deleting campaign" });
+// Delete a specific campaign by ID
+app.delete("/api/campaigns/:id", isAuthenticated, hasOrganization, async (req, res) => {
+  try {
+    const campaignId = parseInt(req.params.id, 10);
+    console.log(`Attempting to delete campaign with ID: ${campaignId} for org: ${req.user.organizationId}`);
+    
+    if (isNaN(campaignId)) {
+      return res.status(400).json({ message: "Invalid campaign ID" });
     }
-  });
+    
+    const campaign = await storage.getCampaign(campaignId);
+    
+    if (!campaign) {
+      console.log(`Campaign not found for ID: ${campaignId}`);
+      return res.status(404).json({ message: "Campaign not found" });
+    }
+    
+    if (campaign.organizationId !== req.user.organizationId) {
+      console.log(`Access denied for campaign ID: ${campaignId}. Campaign org: ${campaign.organizationId}, User org: ${req.user.organizationId}`);
+      return res.status(403).json({ message: "Access denied" });
+    }
+    
+    console.log(`Deleting campaign: ${campaign.name} (ID: ${campaignId})`);
+    
+    const success = await storage.deleteCampaign(campaignId);
+    
+    if (success) {
+      console.log(`Campaign ${campaignId} deleted successfully`);
+      return res.status(200).json({ message: "Campaign deleted successfully" });
+    } else {
+      console.error(`Failed to delete campaign ${campaignId}`);
+      return res.status(500).json({ message: "Failed to delete campaign" });
+    }
+  } catch (error) {
+    console.error("Error deleting campaign:", error);
+    res.status(500).json({ message: "Error deleting campaign" });
+  }
+});
 
-  // Get campaign results
-  app.get("/api/campaigns/:id/results", isAuthenticated, hasOrganization, async (req, res) => {
-    try {
-      const campaignId = parseInt(req.params.id, 10);
-      const campaign = await storage.getCampaign(campaignId);
-      
-      if (!campaign || campaign.organizationId !== req.user.organizationId) {
-        return res.status(404).json({ message: "Campaign not found" });
-      }
-      
-      const results = await storage.listCampaignResults(campaignId);
-      
-      // Enrich results with target data
-      const enrichedResults = [];
-      for (const result of results) {
-        const target = await storage.getTarget(result.targetId);
-        enrichedResults.push({
-          ...result,
-          target: target ? {
-            id: target.id,
-            firstName: target.firstName,
-            lastName: target.lastName,
-            email: target.email,
-            position: target.position
-          } : null
-        });
-      }
-      
-      res.json(enrichedResults);
-    } catch (error) {
-      console.error("Error fetching campaign results:", error);
-      res.status(500).json({ message: "Error fetching campaign results" });
+// Get campaign results
+app.get("/api/campaigns/:id/results", isAuthenticated, hasOrganization, async (req, res) => {
+  try {
+    const campaignId = parseInt(req.params.id, 10);
+    
+    if (isNaN(campaignId)) {
+      return res.status(400).json({ message: "Invalid campaign ID" });
     }
-  });
+    
+    const campaign = await storage.getCampaign(campaignId);
+    
+    if (!campaign || campaign.organizationId !== req.user.organizationId) {
+      return res.status(404).json({ message: "Campaign not found" });
+    }
+    
+    const results = await storage.listCampaignResults(campaignId);
+    res.json(results);
+  } catch (error) {
+    console.error("Error fetching campaign results:", error);
+    res.status(500).json({ message: "Error fetching campaign results" });
+  }
+});
 
-  // Users Endpoints
-  // User profile endpoints
-  app.put("/api/user/profile", isAuthenticated, async (req, res) => {
-    try {
-      const allowedFields = ['firstName', 'lastName', 'position', 'bio'];
-      const updateData: Partial<User> = {};
-      
-      // Only allow specific fields to be updated
-      for (const field of allowedFields) {
-        if (req.body[field] !== undefined) {
-          updateData[field as keyof User] = req.body[field];
-        }
-      }
-      
-      const updatedUser = await storage.updateUser(req.user.id, updateData);
-      
-      if (!updatedUser) {
-        return res.status(404).json({ message: "User not found" });
-      }
-      
-      res.json(updatedUser);
-    } catch (error) {
-      console.error("Error updating user profile:", error);
-      res.status(500).json({ message: "Failed to update user profile" });
-    }
-  });
-  
-  app.post("/api/user/change-password", isAuthenticated, async (req, res) => {
-    try {
-      const { currentPassword, newPassword } = req.body;
-      
-      if (!currentPassword || !newPassword) {
-        return res.status(400).json({ message: "Current password and new password are required" });
-      }
-      
-      // Get the user with password (for verification)
-      const user = await storage.getUser(req.user.id);
-      
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
-      }
-      
-      // Use imported password functions from auth.ts
-      // They are already available since we imported them at the top
-      
-      // Verify current password
-      const isPasswordValid = await comparePasswords(currentPassword, user.password);
-      
-      if (!isPasswordValid) {
-        return res.status(401).json({ message: "Current password is incorrect" });
-      }
-      
-      // Validate password strength
-      const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
-      if (!passwordRegex.test(newPassword)) {
-        return res.status(400).json({ 
-          message: "Password must be at least 8 characters with uppercase, lowercase, number, and special character" 
-        });
-      }
-      
-      // Hash the new password
-      const hashedPassword = await hashPassword(newPassword);
-      
-      // Update the user's password
-      const updatedUser = await storage.updateUser(req.user.id, { 
-        password: hashedPassword,
-        failedLoginAttempts: 0,
-        accountLocked: false,
-        accountLockedUntil: null
-      });
-      
-      if (!updatedUser) {
-        return res.status(500).json({ message: "Failed to update password" });
-      }
-      
-      res.json({ message: "Password updated successfully" });
-    } catch (error) {
-      console.error("Error changing password:", error);
-      res.status(500).json({ message: "Failed to change password" });
-    }
-  });
-  
-  app.post("/api/user/profile-picture", isAuthenticated, upload.single('profilePicture'), async (req, res) => {
-    try {
-      if (!req.file) {
-        return res.status(400).json({ message: "No file uploaded" });
-      }
-      
-      // Convert image to base64 for storage
-      // In a production app, you might want to store the file elsewhere and just save the URL
-      const profilePicture = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
-      
-      const updatedUser = await storage.updateUser(req.user.id, { profilePicture });
-      
-      if (!updatedUser) {
-        return res.status(404).json({ message: "User not found" });
-      }
-      
-      res.json(updatedUser);
-    } catch (error) {
-      console.error("Error updating profile picture:", error);
-      res.status(500).json({ message: "Failed to update profile picture" });
-    }
-  });
-  
-  app.get("/api/users", isAuthenticated, async (req, res) => {
-    try {
-      const users = await storage.listUsers(req.user.organizationId);
-      res.json(users);
-    } catch (error) {
-      res.status(500).json({ message: "Error fetching users" });
-    }
-  });
+// Add the debug endpoint
+app.get("/api/debug/email-templates", isAuthenticated, async (req, res) => {
+  try {
+    console.log("Debug: Fetching all email templates for user org:", req.user.organizationId);
+    
+    // Get all templates from database
+    const result = await pool.query(
+      'SELECT id, name, organization_id FROM email_templates ORDER BY id'
+    );
+    
+    console.log("Debug: All email templates in database:", result.rows);
+    
+    // Get templates for user's organization
+    const userTemplates = result.rows.filter(t => t.organization_id === req.user.organizationId);
+    console.log("Debug: Templates for user's organization:", userTemplates);
+    
+    res.json({
+      allTemplates: result.rows,
+      userTemplates: userTemplates,
+      userOrgId: req.user.organizationId
+    });
+  } catch (error) {
+    console.error("Debug endpoint error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
 
-  const httpServer = createServer(app);
-  return httpServer;
+// Return the server instance
+return server;
 }

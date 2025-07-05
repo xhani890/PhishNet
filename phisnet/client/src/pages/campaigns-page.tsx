@@ -48,7 +48,24 @@ export default function CampaignsPage() {
 
   const deleteMutation = useMutation({
     mutationFn: async (campaignId: number) => {
+      console.log('Deleting campaign with ID:', campaignId);
+      
       const response = await apiRequest('DELETE', `/api/campaigns/${campaignId}`);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Delete response error:', errorText);
+        
+        // Try to parse as JSON, but handle HTML error pages
+        try {
+          const errorData = JSON.parse(errorText);
+          throw new Error(errorData.message || 'Failed to delete campaign');
+        } catch (parseError) {
+          // If it's not JSON (like an HTML error page), throw a generic error
+          throw new Error(`Server error: ${response.status} ${response.statusText}`);
+        }
+      }
+      
       return await response.json();
     },
     onSuccess: () => {
@@ -59,8 +76,10 @@ export default function CampaignsPage() {
       queryClient.invalidateQueries({ queryKey: ['/api/campaigns'] });
       queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
       setDeleteDialogOpen(false);
+      setCampaignToDelete(null);
     },
     onError: (error) => {
+      console.error('Campaign deletion error:', error);
       toast({
         title: "Error deleting campaign",
         description: error.message,
@@ -85,6 +104,7 @@ export default function CampaignsPage() {
   };
 
   const handleEdit = (campaignId: number) => {
+    console.log('Edit button clicked for campaign ID:', campaignId);
     setSelectedCampaignId(campaignId);
     setIsEditing(true);
   };
@@ -130,12 +150,11 @@ export default function CampaignsPage() {
               <TableRow>
                 <TableHead>Name</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>Target Group</TableHead>
-                <TableHead>Sent</TableHead>
+                <TableHead>Targets</TableHead>
                 <TableHead>Open Rate</TableHead>
                 <TableHead>Click Rate</TableHead>
                 <TableHead>Created</TableHead>
-                <TableHead>Actions</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -148,8 +167,7 @@ export default function CampaignsPage() {
                         {campaign.status}
                       </Badge>
                     </TableCell>
-                    <TableCell>{campaign.targetGroup}</TableCell>
-                    <TableCell>{campaign.sentCount ? `${campaign.sentCount}/${campaign.totalTargets}` : '-'}</TableCell>
+                    <TableCell>{campaign.totalTargets || 0}</TableCell>
                     <TableCell>{campaign.openRate !== null ? `${campaign.openRate}%` : "-"}</TableCell>
                     <TableCell>{campaign.clickRate !== null ? `${campaign.clickRate}%` : "-"}</TableCell>
                     <TableCell>
@@ -184,8 +202,8 @@ export default function CampaignsPage() {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-10 text-muted-foreground">
-                    No campaigns found. Create your first campaign.
+                  <TableCell colSpan={7} className="text-center py-10 text-muted-foreground">
+                    No campaigns found. Create your first campaign to get started.
                   </TableCell>
                 </TableRow>
               )}
@@ -194,94 +212,60 @@ export default function CampaignsPage() {
         </CardContent>
       </Card>
 
-      {/* Campaign summary cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Scheduled</p>
-                <h3 className="text-2xl font-semibold mt-1">
-                  {campaigns.filter(c => c.status === "Scheduled").length}
-                </h3>
-              </div>
-              <Calendar className="h-8 w-8 text-primary" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Active</p>
-                <h3 className="text-2xl font-semibold mt-1">
-                  {campaigns.filter(c => c.status === "Active").length}
-                </h3>
-              </div>
-              <Mail className="h-8 w-8 text-success" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Targets</p>
-                <h3 className="text-2xl font-semibold mt-1">
-                  {campaigns.reduce((sum, c) => sum + (c.totalTargets || 0), 0)}
-                </h3>
-              </div>
-              <Users className="h-8 w-8 text-warning" />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
       {/* Create Campaign Dialog */}
       <Dialog open={isCreating} onOpenChange={setIsCreating}>
-        <DialogContent className="max-w-3xl">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
           <DialogHeader>
-            <DialogTitle>Create New Campaign</DialogTitle>
+            <DialogTitle>Create Campaign</DialogTitle>
           </DialogHeader>
-          <CampaignForm onClose={() => setIsCreating(false)} />
+          <div className="overflow-y-auto max-h-[calc(90vh-120px)] pr-2">
+            <CampaignForm onClose={() => setIsCreating(false)} />
+          </div>
         </DialogContent>
       </Dialog>
-      
+
       {/* Edit Campaign Dialog */}
       <Dialog open={isEditing} onOpenChange={setIsEditing}>
-        <DialogContent className="max-w-3xl">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
           <DialogHeader>
             <DialogTitle>Edit Campaign</DialogTitle>
           </DialogHeader>
-          {selectedCampaignId && (
-            <CampaignEditor 
-              campaignId={selectedCampaignId} 
-              onClose={() => setIsEditing(false)} 
-            />
-          )}
+          <div className="overflow-y-auto max-h-[calc(90vh-120px)] pr-2">
+            {selectedCampaignId && (
+              <CampaignEditor 
+                campaignId={selectedCampaignId} 
+                onClose={() => setIsEditing(false)} 
+              />
+            )}
+          </div>
         </DialogContent>
       </Dialog>
-      
+
       {/* View Campaign Dialog */}
       <Dialog open={isViewing} onOpenChange={setIsViewing}>
-        <DialogContent className="max-w-5xl h-[85vh]">
-          {selectedCampaignId && (
-            <CampaignDetails 
-              campaignId={selectedCampaignId}
-              onEdit={handleEditFromView}
-            />
-          )}
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden">
+          <DialogHeader>
+            <DialogTitle>Campaign Details</DialogTitle>
+          </DialogHeader>
+          <div className="overflow-y-auto max-h-[calc(90vh-120px)] pr-2">
+            {selectedCampaignId && (
+              <CampaignDetails 
+                campaignId={selectedCampaignId} 
+                onEdit={handleEditFromView}
+              />
+            )}
+          </div>
         </DialogContent>
       </Dialog>
-      
+
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Campaign</AlertDialogTitle>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete this campaign? 
-              This action cannot be undone.
+              This action cannot be undone. This will permanently delete the campaign
+              and all associated data.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

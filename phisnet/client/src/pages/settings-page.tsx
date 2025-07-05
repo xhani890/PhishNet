@@ -17,12 +17,16 @@ import {
   Shield, 
   RefreshCw, 
   AlertTriangle,
-  Loader2
+  Loader2,
+  X,
+  ArrowLeft
 } from "lucide-react";
+import { useLocation } from "wouter";
 
 export default function SettingsPage() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const [, navigate] = useLocation();
   
   // State for various settings
   const [emailNotifications, setEmailNotifications] = useState(true);
@@ -160,10 +164,37 @@ export default function SettingsPage() {
       setIsChangingPassword(false);
     }
   };
+
+  // Handle close/back navigation
+  const handleClose = () => {
+    navigate("/");
+  };
   
   return (
     <div className="container max-w-4xl py-6 mx-auto">
-      <h1 className="text-2xl font-bold mb-6 text-center">Settings</h1>
+      {/* Header with close button */}
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold text-center">Settings</h1>
+        <div className="flex items-center gap-2">
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={handleClose}
+            className="flex items-center gap-2"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Dashboard
+          </Button>
+          <Button 
+            variant="ghost" 
+            size="icon"
+            onClick={handleClose}
+            className="h-8 w-8"
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
       
       <Tabs defaultValue="account">
         <TabsList className="mb-6">
