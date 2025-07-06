@@ -19,7 +19,9 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { Plus, Edit, Trash2, Send, Loader2 } from "lucide-react";
+import { Plus, Edit, Trash2, Send, Loader2, HelpCircle } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 const smtpProfileSchema = z.object({
   name: z.string().min(1, "Profile name is required"),
@@ -38,6 +40,8 @@ export default function SmtpProfilesPage() {
   const queryClient = useQueryClient();
   const [isCreating, setIsCreating] = useState(false);
   const [selectedProfile, setSelectedProfile] = useState<any>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [profileToDelete, setProfileToDelete] = useState<any>(null);
   
   const { data: profiles, isLoading } = useQuery({
     queryKey: ['/api/smtp-profiles'],
@@ -79,6 +83,33 @@ export default function SmtpProfilesPage() {
     },
   });
 
+  const deleteSmtpMutation = useMutation({
+    mutationFn: async (profileId: number) => {
+      const response = await apiRequest('DELETE', `/api/smtp-profiles/${profileId}`);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to delete SMTP profile');
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "SMTP Profile deleted",
+        description: "The SMTP profile has been deleted successfully.",
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/smtp-profiles'] });
+      setDeleteDialogOpen(false);
+      setProfileToDelete(null);
+    },
+    onError: (error) => {
+      toast({
+        title: "Error deleting profile",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  });
+
   function onSubmit(data: SmtpProfileFormValues) {
     createMutation.mutate(data);
   }
@@ -110,6 +141,34 @@ export default function SmtpProfilesPage() {
     });
     setIsCreating(true);
   };
+
+  const openDeleteDialog = (profile: any) => {
+    setProfileToDelete(profile);
+    setDeleteDialogOpen(true);
+  };
+
+  // Add this helper component
+  const FieldWithHelp = ({ label, help, children }) => (
+    <FormItem>
+      <FormLabel className="flex items-center gap-2">
+        {label}
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" />
+            </TooltipTrigger>
+            <TooltipContent>
+              <p className="max-w-xs">{help}</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      </FormLabel>
+      <FormControl>
+        {children}
+      </FormControl>
+      <FormMessage />
+    </FormItem>
+  );
 
   return (
     <AppLayout>
@@ -158,7 +217,7 @@ export default function SmtpProfilesPage() {
                         <Button variant="ghost" size="icon" onClick={() => handleEditProfile(profile)}>
                           <Edit className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="icon">
+                        <Button variant="ghost" size="icon" onClick={() => openDeleteDialog(profile)}>
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
@@ -206,13 +265,12 @@ export default function SmtpProfilesPage() {
                   control={form.control}
                   name="host"
                   render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>SMTP Host</FormLabel>
-                      <FormControl>
-                        <Input placeholder="smtp.example.com" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
+                    <FieldWithHelp 
+                      label="SMTP Host" 
+                      help="The server address of your email provider (e.g., smtp.gmail.com, smtp.outlook.com)"
+                    >
+                      <Input placeholder="smtp.gmail.com" {...field} />
+                    </FieldWithHelp>
                   )}
                 />
                 
@@ -332,6 +390,34 @@ export default function SmtpProfilesPage() {
           </Form>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete SMTP Profile</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{profileToDelete?.name}"? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={() => deleteSmtpMutation.mutate(profileToDelete?.id)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteSmtpMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete Profile"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppLayout>
   );
 }

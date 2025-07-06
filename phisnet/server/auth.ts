@@ -6,7 +6,7 @@ import session from "express-session";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { storage } from "./storage";
-import { User as SelectUser, userValidationSchema, forgotPasswordSchema, resetPasswordSchema } from "@shared/schema";
+import { User as SelectUser, userValidationSchema } from "@shared/schema";
 import { sql } from "drizzle-orm";
 import { z } from "zod";
 import multer from "multer";

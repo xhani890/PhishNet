@@ -59,11 +59,31 @@ export default function LandingPagesPage() {
       </div>
 
       <Tabs defaultValue="all" className="w-full">
-        <TabsList className="mb-6 bg-background border">
-          <TabsTrigger value="all" className="data-[state=active]:bg-secondary data-[state=active]:text-foreground data-[state=inactive]:text-foreground">All Pages</TabsTrigger>
-          <TabsTrigger value="login" className="data-[state=active]:bg-secondary data-[state=active]:text-foreground data-[state=inactive]:text-foreground">Login Pages</TabsTrigger>
-          <TabsTrigger value="form" className="data-[state=active]:bg-secondary data-[state=active]:text-foreground data-[state=inactive]:text-foreground">Form Pages</TabsTrigger>
-          <TabsTrigger value="educational" className="data-[state=active]:bg-secondary data-[state=active]:text-foreground data-[state=inactive]:text-foreground">Educational</TabsTrigger>
+        <TabsList className="mb-6 bg-muted p-1 h-auto">
+          <TabsTrigger 
+            value="all" 
+            className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm"
+          >
+            All Pages
+          </TabsTrigger>
+          <TabsTrigger 
+            value="login" 
+            className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm"
+          >
+            Login Pages
+          </TabsTrigger>
+          <TabsTrigger 
+            value="form" 
+            className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm"
+          >
+            Form Pages
+          </TabsTrigger>
+          <TabsTrigger 
+            value="educational" 
+            className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm"
+          >
+            Educational
+          </TabsTrigger>
         </TabsList>
 
         {['all', 'login', 'form', 'educational'].map(tabValue => (

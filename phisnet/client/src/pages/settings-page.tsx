@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
@@ -32,7 +32,7 @@ export default function SettingsPage() {
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [securityAlerts, setSecurityAlerts] = useState(true);
   const [darkMode, setDarkMode] = useState(false);
-  const [sessionTimeout, setSessionTimeout] = useState(60);
+  const [sessionTimeout, setSessionTimeout] = useState(30);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   
   // Password form state
@@ -41,6 +41,14 @@ export default function SettingsPage() {
     newPassword: "",
     confirmPassword: "",
   });
+  
+  useEffect(() => {
+    // Load saved session timeout or default to 30 minutes
+    const savedTimeout = localStorage.getItem('sessionTimeoutMinutes');
+    if (savedTimeout) {
+      setSessionTimeout(parseInt(savedTimeout));
+    }
+  }, []);
   
   // Handle settings toggle
   const handleToggle = (setting: string, value: boolean) => {
@@ -73,13 +81,9 @@ export default function SettingsPage() {
       // Store in local storage to persist between page loads
       localStorage.setItem('sessionTimeoutMinutes', minutes.toString());
       
-      // Update global constant (this will take effect after page reload)
-      // For immediate effect, would need to trigger a page reload or 
-      // implement a context provider to share the setting
-      
       toast({
         title: "Settings Updated",
-        description: `Session timeout set to ${minutes} minutes`,
+        description: `Session timeout set to ${minutes} minutes. This will take effect after you refresh the page.`,
       });
     } catch (error) {
       console.error('Error updating session timeout:', error);
@@ -168,6 +172,35 @@ export default function SettingsPage() {
   // Handle close/back navigation
   const handleClose = () => {
     navigate("/");
+  };
+  
+  // Update your settings page with proper save functionality
+  const handleSaveSettings = async (section: string, data: any) => {
+    try {
+      const response = await fetch(`/api/user/settings/${section}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save settings');
+      }
+
+      toast({
+        title: "Settings saved",
+        description: `Your ${section} settings have been updated successfully.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error saving settings",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
   };
   
   return (
@@ -295,7 +328,7 @@ export default function SettingsPage() {
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="flex flex-col space-y-1.5">
-                  <Label htmlFor="sessionTimeout">
+                  <Label htmlFor="sessionTimeout" className="text-sm font-medium">
                     Session Timeout (minutes)
                   </Label>
                   <div className="flex space-x-2">
@@ -310,14 +343,15 @@ export default function SettingsPage() {
                     />
                     <Button 
                       variant="outline" 
-                      onClick={() => handleSessionTimeoutChange(60)}
+                      onClick={() => handleSessionTimeoutChange(30)}
                     >
                       <RefreshCw className="h-4 w-4 mr-2" />
                       Reset to Default
                     </Button>
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    Your session will expire after {sessionTimeout} minutes of inactivity
+                    Your session will expire after {sessionTimeout} minutes of inactivity. 
+                    Warning will appear 2 minutes before expiration.
                   </p>
                 </div>
                 

@@ -2,40 +2,44 @@
 import { drizzle } from 'drizzle-orm/node-postgres';
 import session from 'express-session';
 import ConnectPgSimple from 'connect-pg-simple';
-import { db, pool } from './db';
-import { eq, and, count } from 'drizzle-orm';
+import { db, pool } from "./db"; // Add pool to this import
 import { 
-  users, 
-  organizations, 
-  groups, 
-  targets, 
-  smtpProfiles, 
-  emailTemplates, 
-  landingPages, 
   campaigns, 
   campaignResults, 
-  passwordResetTokens,
-  type User,
-  type Organization,
-  type Group,
-  type Target,
-  type SmtpProfile,
-  type EmailTemplate,
-  type LandingPage,
-  type Campaign,
-  type CampaignResult,
-  type PasswordResetToken,
-  type InsertUser,
-  type InsertOrganization,
-  type InsertGroup,
-  type InsertTarget,
-  type InsertSmtpProfile,
-  type InsertEmailTemplate,
-  type InsertLandingPage,
-  type InsertCampaign,
-  type InsertCampaignResult,
-  type InsertPasswordResetToken
-} from '@shared/schema';
+  emailTemplates, 
+  users, 
+  organizations,
+  targets,
+  groups,
+  smtpProfiles, // Add missing imports
+  landingPages,
+  passwordResetTokens
+} from "@shared/schema";
+import { eq, and, or, desc, asc, count, sql, gte, lte } from "drizzle-orm";
+
+// Add missing type imports
+import type { 
+  User, 
+  InsertUser, 
+  Organization, 
+  InsertOrganization,
+  Group,
+  InsertGroup,
+  Target,
+  InsertTarget,
+  SmtpProfile,
+  InsertSmtpProfile,
+  EmailTemplate,
+  InsertEmailTemplate,
+  LandingPage,
+  InsertLandingPage,
+  Campaign,
+  InsertCampaign,
+  CampaignResult,
+  InsertCampaignResult,
+  PasswordResetToken,
+  InsertPasswordResetToken
+} from "@shared/schema";
 
 // Create PostgreSQL session store
 const PostgresSessionStore = ConnectPgSimple(session);
@@ -115,6 +119,8 @@ export interface IStorage {
   
   // Dashboard stats
   getDashboardStats(organizationId: number): Promise<any>;
+  getPhishingMetrics(organizationId: number): Promise<any[]>;
+  getAtRiskUsers(organizationId: number): Promise<any[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -123,7 +129,7 @@ export class DatabaseStorage implements IStorage {
   constructor() {
     // ALWAYS use database session store - no fallback to memory
     this.sessionStore = new PostgresSessionStore({ 
-      pool, 
+      pool, // This should now work with the imported pool
       tableName: 'session',
       createTableIfMissing: true,
       ttl: 30 * 60 // 30 minutes in seconds
@@ -589,19 +595,142 @@ export class DatabaseStorage implements IStorage {
   // Dashboard stats
   async getDashboardStats(organizationId: number): Promise<any> {
     try {
-      const [campaignCount] = await db.select({ count: count() }).from(campaigns).where(eq(campaigns.organizationId, organizationId));
-      const [userCount] = await db.select({ count: count() }).from(users).where(eq(users.organizationId, organizationId));
-      const [groupCount] = await db.select({ count: count() }).from(groups).where(eq(groups.organizationId, organizationId));
+      // Get campaign stats
+      const campaignStats = await db.select({
+        status: campaigns.status,
+        count: sql<number>`count(*)`.as('count'),
+      })
+      .from(campaigns)
+      .where(eq(campaigns.organizationId, organizationId))
+      .groupBy(campaigns.status);
+      
+      // Get total users in organization
+      const totalUsers = await db.select({ count: sql<number>`count(*)`.as('count') })
+        .from(users)
+        .where(eq(users.organizationId, organizationId));
+      
+      // Get total groups
+      const totalGroups = await db.select({ count: sql<number>`count(*)`.as('count') })
+        .from(groups)
+        .where(eq(groups.organizationId, organizationId));
+      
+      // Get campaign results for success rate - fix the variable name issue
+      const results = await db.select({
+        status: campaignResults.status,
+        count: sql<number>`count(*)`.as('count'),
+      })
+      .from(campaignResults)
+      .innerJoin(campaigns, eq(campaignResults.campaignId, campaigns.id))
+      .where(eq(campaigns.organizationId, organizationId))
+      .groupBy(campaignResults.status);
+      
+      // Calculate metrics
+      const activeCampaigns = campaignStats.find(s => s.status === 'Active')?.count || 0;
+      const totalCampaigns = campaignStats.reduce((sum, s) => sum + s.count, 0);
+      
+      const totalClicks = results.find(r => r.status === 'clicked')?.count || 0;
+      const totalSent = results.reduce((sum, r) => sum + r.count, 0);
+      const successRate = totalSent > 0 ? Math.round((totalClicks / totalSent) * 100) : 0;
+      
+      // Get recent campaign changes (last 30 days)
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      
+      const recentCampaigns = await db.select({ count: sql<number>`count(*)`.as('count') })
+        .from(campaigns)
+        .where(
+          and(
+            eq(campaigns.organizationId, organizationId),
+            gte(campaigns.createdAt, thirtyDaysAgo)
+          )
+        );
       
       return {
-        totalCampaigns: campaignCount.count || 0,
-        totalUsers: userCount.count || 0,
-        totalGroups: groupCount.count || 0,
-        activeCampaigns: 0, // This would need more complex logic
+        activeCampaigns,
+        totalCampaigns,
+        successRate,
+        totalUsers: totalUsers[0]?.count || 0,
+        totalGroups: totalGroups[0]?.count || 0,
+        campaignChange: recentCampaigns[0]?.count || 0,
+        successRateChange: 0,
+        newUsers: 0,
+        trainingCompletion: 75,
+        trainingCompletionChange: 5,
       };
     } catch (error) {
-      console.error("Error fetching dashboard stats:", error);
+      console.error("Error getting dashboard stats:", error);
       throw error;
+    }
+  }
+
+  async getPhishingMetrics(organizationId: number): Promise<any[]> {
+    try {
+      // Get last 6 months of data
+      const sixMonthsAgo = new Date();
+      sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+      
+      const metrics = await db.select({
+        month: sql<string>`DATE_TRUNC('month', ${campaigns.createdAt})`.as('month'),
+        sent: sql<number>`count(CASE WHEN ${campaignResults.status} = 'sent' THEN 1 END)`.as('sent'),
+        opened: sql<number>`count(CASE WHEN ${campaignResults.status} = 'opened' THEN 1 END)`.as('opened'),
+        clicked: sql<number>`count(CASE WHEN ${campaignResults.status} = 'clicked' THEN 1 END)`.as('clicked'),
+        submitted: sql<number>`count(CASE WHEN ${campaignResults.status} = 'submitted' THEN 1 END)`.as('submitted'),
+      })
+      .from(campaigns)
+      .leftJoin(campaignResults, eq(campaigns.id, campaignResults.campaignId))
+      .where(
+        and(
+          eq(campaigns.organizationId, organizationId),
+          gte(campaigns.createdAt, sixMonthsAgo)
+        )
+      )
+      .groupBy(sql`DATE_TRUNC('month', ${campaigns.createdAt})`)
+      .orderBy(sql`DATE_TRUNC('month', ${campaigns.createdAt})`);
+      
+      return metrics.map(m => ({
+        date: new Date(m.month).toLocaleDateString('en-US', { month: 'short' }),
+        sent: m.sent,
+        opened: m.opened,
+        clicked: m.clicked,
+        submitted: m.submitted,
+        rate: m.sent > 0 ? Math.round((m.clicked / m.sent) * 100) : 0,
+      }));
+    } catch (error) {
+      console.error("Error getting phishing metrics:", error);
+      return [];
+    }
+  }
+
+  async getAtRiskUsers(organizationId: number): Promise<any[]> {
+    try {
+      // Get users who clicked or submitted in recent campaigns
+      const riskUsers = await db.select({
+        targetId: targets.id,
+        firstName: targets.firstName,
+        lastName: targets.lastName,
+        email: targets.email,
+        department: targets.department,
+        riskScore: sql<number>`count(CASE WHEN ${campaignResults.status} IN ('clicked', 'submitted') THEN 1 END)`.as('riskScore'),
+      })
+      .from(targets)
+      .innerJoin(groups, eq(targets.groupId, groups.id))
+      .leftJoin(campaignResults, eq(targets.id, campaignResults.targetId))
+      .where(eq(groups.organizationId, organizationId))
+      .groupBy(targets.id, targets.firstName, targets.lastName, targets.email, targets.department)
+      .having(sql`count(CASE WHEN ${campaignResults.status} IN ('clicked', 'submitted') THEN 1 END) > 0`)
+      .orderBy(sql`count(CASE WHEN ${campaignResults.status} IN ('clicked', 'submitted') THEN 1 END) DESC`)
+      .limit(10);
+      
+      return riskUsers.map(user => ({
+        id: user.targetId,
+        name: `${user.firstName} ${user.lastName}`,
+        department: user.department || 'Unknown',
+        riskLevel: user.riskScore >= 3 ? 'High Risk' : user.riskScore >= 2 ? 'Medium Risk' : 'Low Risk',
+        riskScore: user.riskScore,
+      }));
+    } catch (error) {
+      console.error("Error getting at-risk users:", error);
+      return [];
     }
   }
 }

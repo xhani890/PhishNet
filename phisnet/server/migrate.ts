@@ -25,8 +25,12 @@ async function runMigration() {
         ADD COLUMN IF NOT EXISTS failed_login_attempts INTEGER NOT NULL DEFAULT 0,
         ADD COLUMN IF NOT EXISTS last_failed_login TIMESTAMPTZ,
         ADD COLUMN IF NOT EXISTS account_locked BOOLEAN NOT NULL DEFAULT FALSE,
-        ADD COLUMN IF NOT EXISTS account_locked_until TIMESTAMPTZ
+        ADD COLUMN IF NOT EXISTS account_locked_until TIMESTAMPTZ,
+        ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE NOT NULL
       `);
+      
+      // Update existing users
+      await pool.query(`UPDATE users SET is_active = TRUE WHERE is_active IS NULL`);
       
       console.log('Migration completed successfully - added new columns to users table.');
     } else {

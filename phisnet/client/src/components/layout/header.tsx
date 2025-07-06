@@ -13,6 +13,7 @@ import { Bell, ChevronDown, HelpCircle, User as UserIcon, Building, Settings } f
 import { Separator } from "@/components/ui/separator";
 import { User } from "@shared/schema";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import NotificationBell from "@/components/notifications/notification-bell";
 
 interface HeaderProps {
   user: User;

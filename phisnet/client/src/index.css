@@ -92,7 +92,32 @@
 }
 
 .tabs-list [data-state="inactive"] {
+  background-color: transparent;
+  color: hsl(var(--muted-foreground));
+}
+
+.tabs-list [data-state="inactive"]:hover {
+  background-color: hsl(var(--muted) / 0.8);
   color: hsl(var(--foreground));
+}
+
+/* Ensure all button text is visible */
+button[data-state="inactive"] {
+  color: hsl(var(--muted-foreground)) !important;
+}
+
+button[data-state="active"] {
+  color: hsl(var(--primary-foreground)) !important;
+}
+
+/* Fix sidebar text visibility */
+.sidebar-menu-button {
+  color: hsl(var(--sidebar-foreground));
+}
+
+.sidebar-menu-button[data-active="true"] {
+  color: hsl(var(--sidebar-primary-foreground));
+  background-color: hsl(var(--sidebar-primary));
 }
 
 /* Email preview styles */

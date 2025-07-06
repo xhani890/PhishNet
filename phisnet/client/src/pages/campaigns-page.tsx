@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import AppLayout from "@/components/layout/app-layout";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -131,6 +131,18 @@ export default function CampaignsPage() {
     setIsEditing(true);
   };
 
+  // Check URL for the action parameter when component mounts
+  useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    const action = searchParams.get('action');
+    
+    if (action === 'create') {
+      setIsCreating(true);
+      // Clean up URL (optional)
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, []);
+  
   return (
     <AppLayout>
       <div className="flex justify-between items-center mb-6">

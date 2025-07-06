@@ -1,8 +1,8 @@
-import { ReactNode } from "react";
+import { ReactNode, useEffect } from "react";
 import Sidebar from "./sidebar";
 import Header from "./header";
 import { useAuth } from "@/hooks/use-auth";
-import { useIdleTimeout } from "@/hooks/use-idle-timeout";
+import { initSessionManager, cleanupSessionManager } from "@/lib/session-manager";
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -10,8 +10,16 @@ interface AppLayoutProps {
 
 export default function AppLayout({ children }: AppLayoutProps) {
   const { user } = useAuth();
-  // Initialize idle timeout detector for automatic logout after 10 minutes
-  useIdleTimeout();
+
+  useEffect(() => {
+    // Initialize session management when app loads
+    initSessionManager();
+    
+    // Cleanup on unmount
+    return () => {
+      cleanupSessionManager();
+    };
+  }, []);
 
   if (!user) {
     return null;
