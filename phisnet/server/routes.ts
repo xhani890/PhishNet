@@ -3,14 +3,37 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated, isAdmin, hasOrganization, hashPassword, comparePasswords, refreshSession } from "./auth";
 import { db } from "./db";
-import { eq } from "drizzle-orm";
+import { 
+  campaigns, 
+  campaignResults, 
+  emailTemplates, 
+  users, 
+  organizations,
+  targets,
+  groups,
+  notificationsSchema,
+  notificationPreferencesSchema,
+  rolesSchema,
+  userRolesSchema,
+  insertGroupSchema, 
+  insertTargetSchema, 
+  insertSmtpProfileSchema, 
+  insertEmailTemplateSchema, 
+  insertLandingPageSchema, 
+  insertCampaignSchema,
+  updateLandingPageSchema,
+  type User
+} from "@shared/schema";
+import { eq, and, or, desc, asc, count, sql, gte, lte, isNull, isNotNull } from "drizzle-orm";
 import multer from "multer";
 import Papa from "papaparse";
-import { insertGroupSchema, insertTargetSchema, insertSmtpProfileSchema, insertEmailTemplateSchema, insertLandingPageSchema, insertCampaignSchema, emailTemplates, User } from "@shared/schema";
 import { z } from "zod";
+import { NotificationService } from './services/notification-service';
+import { exportReportToCsv } from './utils/report-exporter';
+import path from 'path';
+import fs from 'fs';
 
-// Set up file upload middleware
-const upload = multer({ storage: multer.memoryStorage() });
+const upload = multer();
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Setup authentication
@@ -40,55 +63,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
-  // Dashboard Stats
+  // Dashboard Stats - Real Data
   app.get("/api/dashboard/stats", isAuthenticated, hasOrganization, async (req, res) => {
     try {
       const stats = await storage.getDashboardStats(req.user.organizationId);
       res.json(stats);
     } catch (error) {
+      console.error("Error fetching dashboard stats:", error);
       res.status(500).json({ message: "Error fetching dashboard stats" });
     }
   });
 
-  // Dashboard Metrics (Mock data for chart)
-  app.get("/api/dashboard/metrics", isAuthenticated, (req, res) => {
-    // Provide mock data for the phishing success rate chart
-    const data = [
-      { date: "Jan", rate: 42 },
-      { date: "Feb", rate: 38 },
-      { date: "Mar", rate: 45 },
-      { date: "Apr", rate: 39 },
-      { date: "May", rate: 33 },
-      { date: "Jun", rate: 28 },
-      { date: "Jul", rate: 32 },
-    ];
-    res.json(data);
+  // Dashboard Metrics - Real Data
+  app.get("/api/dashboard/metrics", isAuthenticated, hasOrganization, async (req, res) => {
+    try {
+      const metrics = await storage.getPhishingMetrics(req.user.organizationId);
+      res.json(metrics);
+    } catch (error) {
+      console.error("Error fetching dashboard metrics:", error);
+      res.status(500).json({ message: "Error fetching dashboard metrics" });
+    }
   });
 
-  // Dashboard Threat Data
-  app.get("/api/dashboard/threats", isAuthenticated, (req, res) => {
-    // Provide mock threat data
-    const threats = [
-      {
-        id: 1,
-        name: "Credential Phishing",
-        description: "Recent campaigns target Microsoft 365 users with fake login pages.",
-        level: "high"
-      },
-      {
-        id: 2,
-        name: "Invoice Fraud",
-        description: "Finance departments targeted with fake invoice attachments containing malware.",
-        level: "medium"
-      },
-      {
-        id: 3,
-        name: "CEO Fraud",
-        description: "Impersonation attacks requesting urgent wire transfers or gift card purchases.",
-        level: "medium"
-      }
-    ];
-    res.json(threats);
+  // At-Risk Users - Real Data
+  app.get("/api/dashboard/risk-users", isAuthenticated, hasOrganization, async (req, res) => {
+    try {
+      const riskUsers = await storage.getAtRiskUsers(req.user.organizationId);
+      res.json(riskUsers);
+    } catch (error) {
+      console.error("Error fetching risk users:", error);
+      res.status(500).json({ message: "Error fetching risk users" });
+    }
+  });
+
+  // Threat Landscape - Real Data
+  app.get("/api/dashboard/threats", isAuthenticated, hasOrganization, async (req, res) => {
+    try {
+      // Get campaign types and their success rates - with proper error handling
+      const threats = await db.select({
+        type: sql<string>`COALESCE(${emailTemplates.type}, 'Unknown')`.as('type'),
+        totalSent: sql<number>`count(${campaignResults.id})`.as('totalSent'),
+        successful: sql<number>`count(CASE WHEN ${campaignResults.status} IN ('clicked', 'submitted') THEN 1 END)`.as('successful'),
+      })
+      .from(campaigns)
+      .leftJoin(emailTemplates, eq(campaigns.emailTemplateId, emailTemplates.id))
+      .leftJoin(campaignResults, eq(campaigns.id, campaignResults.campaignId))
+      .where(eq(campaigns.organizationId, req.user.organizationId))
+      .groupBy(emailTemplates.type)
+      .orderBy(sql`count(CASE WHEN ${campaignResults.status} IN ('clicked', 'submitted') THEN 1 END) DESC`);
+      
+      const threatData = threats.map(threat => ({
+        id: Math.random(), // Add id for React keys
+        name: threat.type || 'Unknown',
+        description: `${threat.successful} successful attacks out of ${threat.totalSent} attempts`,
+        level: threat.totalSent > 0 ? 
+          (threat.successful / threat.totalSent > 0.3 ? 'high' : 
+           threat.successful / threat.totalSent > 0.15 ? 'medium' : 'low') : 'low' as "high" | "medium" | "low",
+        severity: threat.totalSent > 0 ? 
+          (threat.successful / threat.totalSent > 0.3 ? 'High' : 
+           threat.successful / threat.totalSent > 0.15 ? 'Medium' : 'Low') : 'Low',
+        count: threat.successful,
+        trend: 'stable',
+      }));
+      
+      res.json(threatData);
+    } catch (error) {
+      console.error("Error fetching threat data:", error);
+      res.status(500).json({ message: "Error fetching threat data" });
+    }
   });
 
   // Dashboard Risk Users
@@ -533,7 +575,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Access denied" });
       }
       
-      const validatedData = updateLandingPageSchema.parse(req.body);
+      const validatedData = insertLandingPageSchema.parse(req.body);
       
       // Update the landing page with the thumbnail
       const updatedPage = await storage.updateLandingPage(
@@ -976,12 +1018,389 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.get("/api/users", isAuthenticated, async (req, res) => {
+  app.get("/api/users", isAuthenticated, hasOrganization, async (req, res) => {
     try {
-      const users = await storage.listUsers(req.user.organizationId);
-      res.json(users);
+      const users = await db.select({
+        id: users.id,
+        firstName: users.firstName,
+        lastName: users.lastName,
+        email: users.email,
+        isActive: users.isActive,
+        lastLogin: users.lastLogin,
+        profilePicture: users.profilePicture,
+        createdAt: users.createdAt,
+      })
+      .from(users)
+      .where(eq(users.organizationId, req.user.organizationId));
+      
+      // Get roles for each user
+      const usersWithRoles = await Promise.all(
+        users.map(async (user) => {
+          const userRoles = await db.select({
+            id: rolesSchema.id,
+            name: rolesSchema.name,
+            description: rolesSchema.description,
+            permissions: rolesSchema.permissions,
+          })
+          .from(userRolesSchema)
+          .innerJoin(rolesSchema, eq(userRolesSchema.roleId, rolesSchema.id))
+          .where(eq(userRolesSchema.userId, user.id));
+          
+          return {
+            ...user,
+            roles: userRoles,
+          };
+        })
+      );
+      
+      res.json(usersWithRoles);
     } catch (error) {
+      console.error("Error fetching users:", error);
       res.status(500).json({ message: "Error fetching users" });
+    }
+  });
+
+  app.post("/api/users", isAuthenticated, hasOrganization, isAdmin, async (req, res) => {
+    try {
+      const { firstName, lastName, email, password, roleIds, isActive } = req.body;
+      
+      // Check if user already exists
+      const existingUser = await db.select()
+        .from(users)
+        .where(eq(users.email, email))
+        .limit(1);
+      
+      if (existingUser.length > 0) {
+        return res.status(400).json({ message: "User with this email already exists" });
+      }
+      
+      // Hash password
+      const hashedPassword = await hashPassword(password);
+      
+      // Create user
+      const [newUser] = await db.insert(users).values({
+        firstName,
+        lastName,
+        email,
+        password: hashedPassword,
+        isActive: isActive ?? true,
+        organizationId: req.user.organizationId,
+      }).returning();
+      
+      // Assign roles
+      if (roleIds && roleIds.length > 0) {
+        const roleAssignments = roleIds.map(roleId => ({
+          userId: newUser.id,
+          roleId: roleId,
+        }));
+        
+        await db.insert(userRolesSchema).values(roleAssignments);
+      }
+      
+      res.status(201).json({ 
+        message: "User created successfully", 
+        user: { 
+          id: newUser.id, 
+          firstName: newUser.firstName, 
+          lastName: newUser.lastName,
+          email: newUser.email 
+        } 
+      });
+    } catch (error) {
+      console.error("Error creating user:", error);
+      res.status(500).json({ message: "Error creating user" });
+    }
+  });
+
+  app.put("/api/users/:id", isAuthenticated, hasOrganization, isAdmin, async (req, res) => {
+    try {
+      const userId = parseInt(req.params.id);
+      const { firstName, lastName, email, roleIds, isActive } = req.body;
+      
+      // Update user
+      const [updatedUser] = await db.update(users)
+        .set({ 
+          firstName, 
+          lastName, 
+          email, 
+          isActive,
+          updatedAt: new Date() 
+        })
+        .where(eq(users.id, userId))
+        .returning();
+      
+      // Update roles
+      if (roleIds) {
+        // Remove existing roles
+        await db.delete(userRolesSchema).where(eq(userRolesSchema.userId, userId));
+        
+        // Add new roles
+        if (roleIds.length > 0) {
+          const roleAssignments = roleIds.map(roleId => ({
+            userId: userId,
+            roleId: roleId,
+          }));
+          
+          await db.insert(userRolesSchema).values(roleAssignments);
+        }
+      }
+      
+      res.json({ message: "User updated successfully", user: updatedUser });
+    } catch (error) {
+      console.error("Error updating user:", error);
+      res.status(500).json({ message: "Error updating user" });
+    }
+  });
+
+  app.delete("/api/users/:id", isAuthenticated, hasOrganization, isAdmin, async (req, res) => {
+    try {
+      const userId = parseInt(req.params.id);
+      
+      // Don't allow deleting self
+      if (userId === req.user.id) {
+        return res.status(400).json({ message: "Cannot delete your own account" });
+      }
+      
+      // Delete user roles first
+      await db.delete(userRolesSchema).where(eq(userRolesSchema.userId, userId));
+      
+      // Delete user
+      await db.delete(users).where(eq(users.id, userId));
+      
+      res.json({ message: "User deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting user:", error);
+      res.status(500).json({ message: "Error deleting user" });
+    }
+  });
+
+  // Reports Export Endpoints
+  app.post("/api/reports/export", isAuthenticated, hasOrganization, async (req, res) => {
+    try {
+      const { type, dateRange, filters } = req.body;
+      
+      let reportData: any = {
+        type,
+        organizationName: req.user.organizationName,
+        dateRange: dateRange ? {
+          start: new Date(dateRange.start),
+          end: new Date(dateRange.end)
+        } : null
+      };
+      
+      // Build date filter
+      const dateFilter = dateRange ? 
+        and(
+          eq(campaigns.organizationId, req.user.organizationId),
+          gte(campaigns.createdAt, new Date(dateRange.start)),
+          lte(campaigns.createdAt, new Date(dateRange.end))
+        ) : eq(campaigns.organizationId, req.user.organizationId);
+      
+      switch (type) {
+        case 'campaigns':
+          const campaigns_data = await db.select().from(campaigns).where(dateFilter);
+          reportData.campaigns = campaigns_data;
+          break;
+        case 'users':
+          const users_data = await db.select().from(users).where(eq(users.organizationId, req.user.organizationId));
+          reportData.users = users_data;
+          break;
+        case 'results':
+          const results_data = await db.select().from(campaignResults)
+            .innerJoin(campaigns, eq(campaignResults.campaignId, campaigns.id))
+            .where(dateFilter);
+          reportData.results = results_data;
+          break;
+        case 'comprehensive':
+          const comp_campaigns = await db.select().from(campaigns).where(dateFilter);
+          const comp_users = await db.select().from(users).where(eq(users.organizationId, req.user.organizationId));
+          const comp_results = await db.select().from(campaignResults)
+            .innerJoin(campaigns, eq(campaignResults.campaignId, campaigns.id))
+            .where(dateFilter);
+          
+          reportData.campaigns = comp_campaigns;
+          reportData.users = comp_users;
+          reportData.results = comp_results;
+          break;
+      }
+      
+      const filename = await exportReportToCsv(reportData);
+      
+      res.json({ 
+        success: true,
+        filename,
+        downloadUrl: `/api/reports/download/${filename}`
+      });
+    } catch (error) {
+      console.error("Error exporting report:", error);
+      res.status(500).json({ message: "Error exporting report" });
+    }
+  });
+  
+  app.get("/api/reports/download/:filename", isAuthenticated, (req, res) => {
+    try {
+      const filename = req.params.filename;
+      const filepath = path.join(process.cwd(), 'uploads', filename);
+      
+      if (!fs.existsSync(filepath)) {
+        return res.status(404).json({ message: "File not found" });
+      }
+      
+      res.download(filepath, filename, (err) => {
+        if (err) {
+          console.error("Error downloading file:", err);
+          res.status(500).json({ message: "Error downloading file" });
+        } else {
+          // Clean up file after download
+          setTimeout(() => {
+            fs.unlink(filepath, (unlinkErr) => {
+              if (unlinkErr) console.error("Error deleting file:", unlinkErr);
+            });
+          }, 5000);
+        }
+      });
+    } catch (error) {
+      console.error("Error serving download:", error);
+      res.status(500).json({ message: "Error serving download" });
+    }
+  });
+
+  // Notification Endpoints
+  app.get("/api/notifications", isAuthenticated, async (req, res) => {
+    try {
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 20;
+      const offset = (page - 1) * limit;
+      
+      const notifications = await NotificationService.getUserNotifications(
+        req.user.id, 
+        limit, 
+        offset
+      );
+      
+      const unreadCount = await NotificationService.getUnreadCount(req.user.id);
+      
+      res.json({
+        notifications,
+        unreadCount,
+        pagination: {
+          page,
+          limit,
+          hasMore: notifications.length === limit
+        }
+      });
+    } catch (error) {
+      console.error("Error fetching notifications:", error);
+      res.status(500).json({ message: "Error fetching notifications" });
+    }
+  });
+
+  app.get("/api/notifications/unread-count", isAuthenticated, async (req, res) => {
+    try {
+      const count = await NotificationService.getUnreadCount(req.user.id);
+      res.json({ count });
+    } catch (error) {
+      console.error("Error fetching unread count:", error);
+      res.status(500).json({ message: "Error fetching unread count" });
+    }
+  });
+
+  app.put("/api/notifications/:id/read", isAuthenticated, async (req, res) => {
+    try {
+      const notificationId = parseInt(req.params.id);
+      const notification = await NotificationService.markAsRead(notificationId, req.user.id);
+      
+      if (!notification) {
+        return res.status(404).json({ message: "Notification not found" });
+      }
+      
+      res.json(notification);
+    } catch (error) {
+      console.error("Error marking notification as read:", error);
+      res.status(500).json({ message: "Error marking notification as read" });
+    }
+  });
+
+  app.put("/api/notifications/mark-all-read", isAuthenticated, async (req, res) => {
+    try {
+      const notifications = await NotificationService.markAllAsRead(req.user.id);
+      res.json({ updated: notifications.length });
+    } catch (error) {
+      console.error("Error marking all notifications as read:", error);
+      res.status(500).json({ message: "Error marking all notifications as read" });
+    }
+  });
+
+  app.delete("/api/notifications/:id", isAuthenticated, async (req, res) => {
+    try {
+      const notificationId = parseInt(req.params.id);
+      await NotificationService.deleteNotification(notificationId, req.user.id);
+      res.json({ message: "Notification deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting notification:", error);
+      res.status(500).json({ message: "Error deleting notification" });
+    }
+  });
+
+  // Notification Preferences
+  app.get("/api/notifications/preferences", isAuthenticated, async (req, res) => {
+    try {
+      const preferences = await NotificationService.getPreferences(req.user.id);
+      res.json(preferences);
+    } catch (error) {
+      console.error("Error fetching notification preferences:", error);
+      res.status(500).json({ message: "Error fetching notification preferences" });
+    }
+  });
+
+  app.put("/api/notifications/preferences", isAuthenticated, async (req, res) => {
+    try {
+      const preferences = await NotificationService.updatePreferences(req.user.id, req.body);
+      res.json(preferences);
+    } catch (error) {
+      console.error("Error updating notification preferences:", error);
+      res.status(500).json({ message: "Error updating notification preferences" });
+    }
+  });
+
+  // Admin endpoint to create notifications
+  app.post("/api/notifications", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const { type, title, message, priority, actionUrl, userIds, broadcast } = req.body;
+      
+      if (broadcast) {
+        // Send to all users in organization
+        const notifications = await NotificationService.createOrganizationNotification({
+          organizationId: req.user.organizationId,
+          type,
+          title,
+          message,
+          priority,
+          actionUrl
+        });
+        res.json({ message: "Broadcast notification sent", count: notifications.length });
+      } else if (userIds && userIds.length > 0) {
+        // Send to specific users
+        const notifications = [];
+        for (const userId of userIds) {
+          const notification = await NotificationService.createNotification({
+            userId,
+            organizationId: req.user.organizationId,
+            type,
+            title,
+            message,
+            priority,
+            actionUrl
+          });
+          notifications.push(notification);
+        }
+        res.json({ message: "Notifications sent", count: notifications.length });
+      } else {
+        res.status(400).json({ message: "Must specify userIds or set broadcast to true" });
+      }
+    } catch (error) {
+      console.error("Error creating notifications:", error);
+      res.status(500).json({ message: "Error creating notifications" });
     }
   });
 

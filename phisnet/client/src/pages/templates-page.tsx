@@ -12,7 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { 
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -29,6 +29,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { EmailTemplate } from "@shared/schema";
+import { useLocation } from "wouter";
 
 // Define a full interface for the template to match our database schema
 interface Template {
@@ -58,6 +59,7 @@ export default function TemplatesPage() {
   const [templateToDelete, setTemplateToDelete] = useState<Template | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [, navigate] = useLocation();
   
   const { data: templates = [] } = useQuery<Template[]>({
     queryKey: ['/api/email-templates'],
@@ -111,6 +113,11 @@ export default function TemplatesPage() {
     }
   };
 
+  const handleCreateCampaign = () => {
+    // Navigate to campaigns page with a query parameter to open the editor
+    navigate("/campaigns?action=create");
+  };
+
   return (
     <AppLayout>
       <Card className="mb-6">
@@ -129,7 +136,7 @@ export default function TemplatesPage() {
         <Button onClick={handleCreate}>
           <Plus className="mr-2 h-4 w-4" /> Create New Template
         </Button>
-        <Button variant="outline">
+        <Button variant="outline" onClick={handleCreateCampaign}>
           <Plus className="mr-2 h-4 w-4" /> Create New Campaign
         </Button>
       </div>

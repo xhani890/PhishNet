@@ -10,14 +10,16 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { User } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
-import { Loader2, Camera, Upload } from "lucide-react";
+import { Loader2, Camera, Upload, X, ArrowLeft } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useLocation } from "wouter";
 
 export default function ProfilePage() {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [, navigate] = useLocation();
   
   const [formState, setFormState] = useState({
     firstName: user?.firstName || "",
@@ -138,12 +140,39 @@ export default function ProfilePage() {
     fileInputRef.current?.click();
   };
 
+  // Handle close/back navigation
+  const handleClose = () => {
+    navigate("/");
+  };
+
   // Generate user initials for avatar fallback
   const userInitials = `${user?.firstName?.[0] || ""}${user?.lastName?.[0] || ""}`;
 
   return (
     <div className="container max-w-4xl py-6 mx-auto">
-      <h1 className="text-2xl font-bold mb-6 text-center">My Profile</h1>
+      {/* Header with close button */}
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold">My Profile</h1>
+        <div className="flex items-center gap-2">
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={handleClose}
+            className="flex items-center gap-2"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Dashboard
+          </Button>
+          <Button 
+            variant="ghost" 
+            size="icon"
+            onClick={handleClose}
+            className="h-8 w-8"
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
       
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Profile Picture Card */}

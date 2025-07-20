@@ -8,7 +8,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { User } from "@shared/schema";
 import { getQueryFn } from "@/lib/queryClient";
-import { Loader2, UsersRound, Lock, Building, Users, UserCheck, Shield } from "lucide-react";
+import { Loader2, UsersRound, Lock, Building, Users, UserCheck, Shield, X, ArrowLeft } from "lucide-react";
+import { useLocation } from "wouter";
 
 interface UserWithDetails extends User {
   profilePicture?: string | null;
@@ -16,6 +17,7 @@ interface UserWithDetails extends User {
 
 export default function OrganizationPage() {
   const { user } = useAuth();
+  const [, navigate] = useLocation();
   const orgName = user?.organizationName;
 
   // Fetch users in organization
@@ -50,9 +52,36 @@ export default function OrganizationPage() {
     }).format(date);
   };
 
+  // Handle close/back navigation
+  const handleClose = () => {
+    navigate("/");
+  };
+
   return (
     <div className="container max-w-5xl py-6 mx-auto">
-      <h1 className="text-2xl font-bold mb-6 text-center">Organization</h1>
+      {/* Header with close button */}
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold text-center">Organization</h1>
+        <div className="flex items-center gap-2">
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={handleClose}
+            className="flex items-center gap-2"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Dashboard
+          </Button>
+          <Button 
+            variant="ghost" 
+            size="icon"
+            onClick={handleClose}
+            className="h-8 w-8"
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         {/* Organization Overview Card */}

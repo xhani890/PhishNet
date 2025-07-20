@@ -9,12 +9,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle
 } from "@/components/ui/alert-dialog";
-import { Clock } from "lucide-react";
+import { Clock, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { trackActivity } from "@/lib/session-manager";
 
-// Warning will show 1 minute before timeout
-const WARNING_BEFORE_TIMEOUT = 60 * 1000; 
+// Warning will show 2 minutes before timeout
+const WARNING_BEFORE_TIMEOUT = 2 * 60 * 1000; // 2 minutes
 
 interface SessionTimeoutAlertProps {
   timeoutInMs: number;
@@ -28,7 +28,7 @@ export function SessionTimeoutAlert({
   onLogout 
 }: SessionTimeoutAlertProps) {
   const [showWarning, setShowWarning] = useState(false);
-  const [countdown, setCountdown] = useState(WARNING_BEFORE_TIMEOUT / 1000);
+  const [countdown, setCountdown] = useState(120); // 2 minutes in seconds
   const { toast } = useToast();
   
   // Reset timer when user chooses to continue session
@@ -38,7 +38,7 @@ export function SessionTimeoutAlert({
     onContinue();
     toast({
       title: "Session Extended",
-      description: "Your session has been extended for 10 minutes.",
+      description: "Your session has been extended for another 30 minutes.",
     });
   }, [onContinue, toast]);
   
@@ -51,11 +51,12 @@ export function SessionTimeoutAlert({
   useEffect(() => {
     let warningTimer: NodeJS.Timeout;
     let countdownTimer: NodeJS.Timeout;
-    let countdownValue = WARNING_BEFORE_TIMEOUT / 1000;
+    let countdownValue = 120; // 2 minutes in seconds
     
     // Set timer to show warning before session expires
     warningTimer = setTimeout(() => {
       setShowWarning(true);
+      setCountdown(120); // Reset to 2 minutes
       
       // Start countdown timer
       countdownTimer = setInterval(() => {
@@ -76,23 +77,42 @@ export function SessionTimeoutAlert({
     };
   }, [timeoutInMs, handleLogout]);
   
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+  
   return (
     <AlertDialog open={showWarning} onOpenChange={setShowWarning}>
-      <AlertDialogContent className="max-w-[400px]">
+      <AlertDialogContent className="max-w-md">
         <AlertDialogHeader>
-          <AlertDialogTitle className="flex items-center gap-2 text-amber-500">
-            <Clock className="h-5 w-5" />
+          <AlertDialogTitle className="flex items-center gap-2 text-amber-600">
+            <AlertTriangle className="h-5 w-5" />
             Session Timeout Warning
           </AlertDialogTitle>
-          <AlertDialogDescription>
-            Your session will expire in <span className="font-bold">{countdown}</span> seconds due to inactivity. Would you like to continue your session?
+          <AlertDialogDescription className="text-center">
+            <div className="space-y-3">
+              <div className="flex items-center justify-center gap-2 text-lg font-mono">
+                <Clock className="h-5 w-5" />
+                <span className="text-2xl font-bold text-amber-600">
+                  {formatTime(countdown)}
+                </span>
+              </div>
+              <p>
+                Your session will expire due to inactivity. Would you like to continue?
+              </p>
+              <div className="text-sm text-muted-foreground">
+                For security reasons, inactive sessions are automatically logged out after 30 minutes.
+              </div>
+            </div>
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel onClick={handleLogout}>
-            Logout
+          <AlertDialogCancel onClick={handleLogout} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+            Logout Now
           </AlertDialogCancel>
-          <AlertDialogAction onClick={handleContinue}>
+          <AlertDialogAction onClick={handleContinue} className="bg-primary text-primary-foreground hover:bg-primary/90">
             Continue Session
           </AlertDialogAction>
         </AlertDialogFooter>

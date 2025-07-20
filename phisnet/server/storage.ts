@@ -2,65 +2,66 @@
 import { drizzle } from 'drizzle-orm/node-postgres';
 import session from 'express-session';
 import ConnectPgSimple from 'connect-pg-simple';
-import { db, pool } from './db';
-import { eq, and, count } from 'drizzle-orm';
+import { db, pool } from "./db"; // Add pool to this import
 import { 
-  users, 
-  organizations, 
-  groups, 
-  targets, 
-  smtpProfiles, 
-  emailTemplates, 
-  landingPages, 
   campaigns, 
   campaignResults, 
-  passwordResetTokens,
-  type User,
-  type Organization,
-  type Group,
-  type Target,
-  type SmtpProfile,
-  type EmailTemplate,
-  type LandingPage,
-  type Campaign,
-  type CampaignResult,
-  type PasswordResetToken,
-  type InsertUser,
-  type InsertOrganization,
-  type InsertGroup,
-  type InsertTarget,
-  type InsertSmtpProfile,
-  type InsertEmailTemplate,
-  type InsertLandingPage,
-  type InsertCampaign,
-  type InsertCampaignResult,
-  type InsertPasswordResetToken
-} from '@shared/schema';
+  emailTemplates, 
+  users, 
+  organizations,
+  targets,
+  groups,
+  smtpProfiles, // Add missing imports
+  landingPages,
+  passwordResetTokens
+} from "@shared/schema";
+import { eq, and, or, desc, asc, count, sql, gte, lte } from "drizzle-orm";
+
+// Add missing type imports
+import type { 
+  User, 
+  InsertUser, 
+  Organization, 
+  InsertOrganization,
+  Group,
+  InsertGroup,
+  Target,
+  InsertTarget,
+  SmtpProfile,
+  InsertSmtpProfile,
+  EmailTemplate,
+  InsertEmailTemplate,
+  LandingPage,
+  InsertLandingPage,
+  Campaign,
+  InsertCampaign,
+  CampaignResult,
+  InsertCampaignResult,
+  PasswordResetToken,
+  InsertPasswordResetToken
+} from "@shared/schema";
 
 // Create PostgreSQL session store
 const PostgresSessionStore = ConnectPgSimple(session);
 
-// Define interface for storage implementation
-interface IStorage {
-  sessionStore: session.Store;
+export interface IStorage {
+  sessionStore: any;
   
   // User methods
   getUser(id: number): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
-  createUser(user: InsertUser & { organizationId: number }): Promise<User>;
+  createUser(user: InsertUser): Promise<User>;
   updateUser(id: number, data: Partial<User>): Promise<User | undefined>;
   deleteUser(id: number): Promise<boolean>;
   listUsers(organizationId: number): Promise<User[]>;
   
-  // Password reset methods
-  createPasswordResetToken(userId: number, token: string, expiresAt: Date): Promise<PasswordResetToken>;
-  getPasswordResetToken(token: string): Promise<PasswordResetToken | undefined>;
-  markPasswordResetTokenUsed(id: number): Promise<boolean>;
-  
   // Organization methods
   getOrganization(id: number): Promise<Organization | undefined>;
   getOrganizationByName(name: string): Promise<Organization | undefined>;
-  createOrganization(organization: InsertOrganization): Promise<Organization>;
+  createOrganization(org: InsertOrganization): Promise<Organization>;
+  updateOrganization(id: number, data: Partial<Organization>): Promise<Organization | undefined>;
+  deleteOrganization(id: number): Promise<boolean>;
+  listOrganizations(): Promise<Organization[]>;
   
   // Group methods
   getGroup(id: number): Promise<Group | undefined>;
@@ -104,23 +105,31 @@ interface IStorage {
   deleteCampaign(id: number): Promise<boolean>;
   listCampaigns(organizationId: number): Promise<Campaign[]>;
   
-  // Campaign Results methods
+  // Campaign Result methods
   getCampaignResult(id: number): Promise<CampaignResult | undefined>;
   createCampaignResult(result: InsertCampaignResult): Promise<CampaignResult>;
   updateCampaignResult(id: number, data: Partial<CampaignResult>): Promise<CampaignResult | undefined>;
+  deleteCampaignResult(id: number): Promise<boolean>;
   listCampaignResults(campaignId: number): Promise<CampaignResult[]>;
   
-  // Dashboard methods
+  // Password Reset Token methods
+  createPasswordResetToken(token: InsertPasswordResetToken): Promise<PasswordResetToken>;
+  getPasswordResetToken(token: string): Promise<PasswordResetToken | undefined>;
+  deletePasswordResetToken(token: string): Promise<boolean>;
+  
+  // Dashboard stats
   getDashboardStats(organizationId: number): Promise<any>;
+  getPhishingMetrics(organizationId: number): Promise<any[]>;
+  getAtRiskUsers(organizationId: number): Promise<any[]>;
 }
 
 export class DatabaseStorage implements IStorage {
-  sessionStore: session.Store;
-  
+  sessionStore: any;
+
   constructor() {
     // ALWAYS use database session store - no fallback to memory
     this.sessionStore = new PostgresSessionStore({ 
-      pool, 
+      pool, // This should now work with the imported pool
       tableName: 'session',
       createTableIfMissing: true,
       ttl: 30 * 60 // 30 minutes in seconds
@@ -140,31 +149,9 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
   
-  async createUser(user: InsertUser & { organizationId: number }): Promise<User> {
-    try {
-      console.log('Creating user:', {
-        ...user,
-        password: '[REDACTED]'  // Don't log the password
-      });
-
-      const [newUser] = await db.insert(users).values({
-        email: user.email,
-        password: user.password,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        isAdmin: user.isAdmin ?? false,
-        organizationId: user.organizationId,
-        organizationName: user.organizationName,
-        failedLoginAttempts: 0,
-        accountLocked: false
-      }).returning();
-
-      console.log('User created successfully:', newUser.id);
-      return newUser;
-    } catch (error) {
-      console.error('Error creating user:', error);
-      throw error;
-    }
+  async createUser(user: InsertUser): Promise<User> {
+    const [newUser] = await db.insert(users).values(user).returning();
+    return newUser;
   }
   
   async updateUser(id: number, data: Partial<User>): Promise<User | undefined> {
@@ -179,7 +166,7 @@ export class DatabaseStorage implements IStorage {
   }
   
   async deleteUser(id: number): Promise<boolean> {
-    const result = await db.delete(users).where(eq(users.id, id));
+    await db.delete(users).where(eq(users.id, id));
     return true;
   }
   
@@ -187,56 +174,40 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(users).where(eq(users.organizationId, organizationId));
   }
   
-  // Password reset methods
-  async createPasswordResetToken(userId: number, token: string, expiresAt: Date): Promise<PasswordResetToken> {
-    const id = this.currentId++;
-    const now = new Date();
-    const newToken = {
-      id,
-      userId,
-      token,
-      expiresAt,
-      used: false,
-      createdAt: now
-    };
-    this.passwordResetTokens.set(id, newToken);
-    return newToken;
-  }
-  
-  async getPasswordResetToken(token: string): Promise<PasswordResetToken | undefined> {
-    const [resetToken] = await db.select().from(passwordResetTokens).where(
-      and(
-        eq(passwordResetTokens.token, token),
-        eq(passwordResetTokens.used, false)
-      )
-    );
-    return resetToken;
-  }
-  
-  async markPasswordResetTokenUsed(id: number): Promise<boolean> {
-    const [updated] = await db.update(passwordResetTokens)
-      .set({ used: true })
-      .where(eq(passwordResetTokens.id, id))
-      .returning();
-    return !!updated;
-  }
-  
   // Organization methods
   async getOrganization(id: number): Promise<Organization | undefined> {
-    const [organization] = await db.select().from(organizations).where(eq(organizations.id, id));
-    return organization;
+    const [org] = await db.select().from(organizations).where(eq(organizations.id, id));
+    return org;
   }
   
   async getOrganizationByName(name: string): Promise<Organization | undefined> {
-    const [organization] = await db.select().from(organizations).where(eq(organizations.name, name));
-    return organization;
+    const [org] = await db.select().from(organizations).where(eq(organizations.name, name));
+    return org;
   }
   
-  async createOrganization(organization: InsertOrganization): Promise<Organization> {
-    const [newOrganization] = await db.insert(organizations).values({
-      name: organization.name,
-    }).returning();
-    return newOrganization;
+  async createOrganization(org: InsertOrganization): Promise<Organization> {
+    const [newOrg] = await db.insert(organizations).values(org).returning();
+    return newOrg;
+  }
+  
+  async updateOrganization(id: number, data: Partial<Organization>): Promise<Organization | undefined> {
+    const [updatedOrg] = await db.update(organizations)
+      .set({
+        ...data,
+        updatedAt: new Date(),
+      })
+      .where(eq(organizations.id, id))
+      .returning();
+    return updatedOrg;
+  }
+  
+  async deleteOrganization(id: number): Promise<boolean> {
+    await db.delete(organizations).where(eq(organizations.id, id));
+    return true;
+  }
+  
+  async listOrganizations(): Promise<Organization[]> {
+    return await db.select().from(organizations);
   }
   
   // Group methods
@@ -271,24 +242,22 @@ export class DatabaseStorage implements IStorage {
   }
   
   async listGroups(organizationId: number): Promise<(Group & { targetCount: number })[]> {
-    // First get all groups
-    const groupsList = await db.select().from(groups).where(eq(groups.organizationId, organizationId));
+    const groupList = await db.select().from(groups).where(eq(groups.organizationId, organizationId));
     
-    // Then get target counts for each group
-    const result = [];
-    for (const group of groupsList) {
-      const [countResult] = await db
-        .select({ count: count() })
-        .from(targets)
-        .where(eq(targets.groupId, group.id));
-      
-      result.push({
-        ...group,
-        targetCount: Number(countResult.count) || 0
-      });
-    }
+    const groupsWithCounts = await Promise.all(
+      groupList.map(async (group) => {
+        const targetCount = await db.select({ count: count() })
+          .from(targets)
+          .where(eq(targets.groupId, group.id));
+        
+        return {
+          ...group,
+          targetCount: targetCount[0]?.count || 0,
+        };
+      })
+    );
     
-    return result;
+    return groupsWithCounts;
   }
   
   // Target methods
@@ -342,8 +311,8 @@ export class DatabaseStorage implements IStorage {
       port: profile.port,
       username: profile.username,
       password: profile.password,
-      fromName: profile.fromName,
       fromEmail: profile.fromEmail,
+      fromName: profile.fromName,
       organizationId,
     }).returning();
     return newProfile;
@@ -372,62 +341,24 @@ export class DatabaseStorage implements IStorage {
   // Email Template methods
   async getEmailTemplate(id: number): Promise<EmailTemplate | undefined> {
     try {
+      console.log(`Getting email template with ID: ${id}`);
+      
+      // Use direct database query to ensure we get the correct data
       const result = await pool.query(
-        `SELECT * FROM email_templates WHERE id = $1`,
+        'SELECT * FROM email_templates WHERE id = $1',
         [id]
       );
       
       if (result.rows.length === 0) {
-        console.log(`No template found with ID ${id}`);
+        console.log(`No email template found with ID: ${id}`);
         return undefined;
       }
       
-      // Map the DB result back to our application model
       const dbTemplate = result.rows[0];
-      console.log(`Found template: ${dbTemplate.id} - ${dbTemplate.name}`);
+      console.log(`Raw email template data from DB:`, dbTemplate);
       
-      return {
-        id: dbTemplate.id,
-        name: dbTemplate.name,
-        subject: dbTemplate.subject,
-        html_content: dbTemplate.html_content,
-        text_content: dbTemplate.text_content,
-        sender_name: dbTemplate.sender_name,
-        sender_email: dbTemplate.sender_email,
-        organizationId: dbTemplate.organization_id, // Make sure this property exists
-        organization_id: dbTemplate.organization_id, // Add this for backwards compatibility
-        created_at: dbTemplate.created_at,
-        updated_at: dbTemplate.updated_at,
-        created_by_id: dbTemplate.created_by_id
-      };
-    } catch (error) {
-      console.error("Error getting template:", error);
-      return undefined;
-    }
-  }
-  
-  async createEmailTemplate(organizationId: number, userId: number, template: InsertEmailTemplate): Promise<EmailTemplate> {
-    try {
-      const result = await pool.query(
-        `INSERT INTO email_templates 
-         (name, subject, html_content, text_content, sender_name, sender_email, organization_id, created_by_id, created_at, updated_at) 
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
-         RETURNING *`,
-        [
-          template.name,
-          template.subject,
-          template.htmlContent,
-          template.textContent || null,
-          template.senderName,
-          template.senderEmail,
-          organizationId,
-          userId
-        ]
-      );
-
-      // Map the DB result back to our application model
-      const dbTemplate = result.rows[0];
-      return {
+      // Map database fields to application model
+      const template = {
         id: dbTemplate.id,
         name: dbTemplate.name,
         subject: dbTemplate.subject,
@@ -435,87 +366,56 @@ export class DatabaseStorage implements IStorage {
         textContent: dbTemplate.text_content,
         senderName: dbTemplate.sender_name,
         senderEmail: dbTemplate.sender_email,
+        type: dbTemplate.type,
+        complexity: dbTemplate.complexity,
+        description: dbTemplate.description,
+        category: dbTemplate.category,
         organizationId: dbTemplate.organization_id,
+        createdById: dbTemplate.created_by_id,
         createdAt: dbTemplate.created_at,
         updatedAt: dbTemplate.updated_at,
-        createdById: dbTemplate.created_by_id
       };
+      
+      console.log(`Mapped email template data:`, template);
+      return template;
     } catch (error) {
-      console.error("Error creating template:", error);
+      console.error("Error getting email template:", error);
       throw error;
     }
+  }
+  
+  async createEmailTemplate(organizationId: number, userId: number, template: InsertEmailTemplate): Promise<EmailTemplate> {
+    const [newTemplate] = await db.insert(emailTemplates).values({
+      name: template.name,
+      subject: template.subject,
+      htmlContent: template.htmlContent,
+      textContent: template.textContent,
+      senderName: template.senderName,
+      senderEmail: template.senderEmail,
+      type: template.type,
+      complexity: template.complexity,
+      description: template.description,
+      category: template.category,
+      organizationId,
+      createdById: userId,
+    }).returning();
+    return newTemplate;
   }
   
   async updateEmailTemplate(id: number, data: Partial<EmailTemplate>): Promise<EmailTemplate | undefined> {
-    try {
-      // Map application model to database model
-      const dbData: any = {};
-      
-      if (data.name) dbData.name = data.name;
-      if (data.subject) dbData.subject = data.subject;
-      if (data.html_content) dbData.html_content = data.html_content;
-      if (data.text_content) dbData.text_content = data.text_content;
-      if (data.sender_name) dbData.sender_name = data.sender_name;
-      if (data.sender_email) dbData.sender_email = data.sender_email;
-      dbData.updated_at = new Date();
-      
-      // Convert to SQL update format
-      const updateFields: string[] = [];
-      const updateValues: any[] = [];
-      let paramCounter = 1;
-      
-      Object.entries(dbData).forEach(([key, value]) => {
-        updateFields.push(`${key} = $${paramCounter}`);
-        updateValues.push(value);
-        paramCounter++;
-      });
-      
-      updateValues.push(id);
-      
-      const result = await pool.query(
-        `UPDATE email_templates SET ${updateFields.join(', ')} WHERE id = $${paramCounter} RETURNING *`,
-        updateValues
-      );
-      
-      if (result.rows.length === 0) {
-        return undefined;
-      }
-      
-      const dbTemplate = result.rows[0];
-      return {
-        id: dbTemplate.id,
-        name: dbTemplate.name,
-        subject: dbTemplate.subject,
-        html_content: dbTemplate.html_content || dbTemplate.html || '',
-        text_content: dbTemplate.text_content || dbTemplate.text || null,
-        sender_name: dbTemplate.sender_name || '',
-        sender_email: dbTemplate.sender_email || dbTemplate.envelope_sender || '',
-        organization_id: dbTemplate.organization_id,
-        created_at: dbTemplate.created_at,
-        updated_at: dbTemplate.updated_at,
-        created_by_id: dbTemplate.created_by_id,
-        type: data.type || null,
-        complexity: data.complexity || null,
-        description: data.description || null,
-        category: data.category || null
-      };
-    } catch (error) {
-      console.error("Error updating template:", error);
-      throw error;
-    }
+    const [updatedTemplate] = await db.update(emailTemplates)
+      .set({
+        ...data,
+        updatedAt: new Date(),
+      })
+      .where(eq(emailTemplates.id, id))
+      .returning();
+    return updatedTemplate;
   }
   
   async deleteEmailTemplate(id: number): Promise<boolean> {
-    try {
-      const result = await pool.query(
-        `DELETE FROM email_templates WHERE id = $1 RETURNING id`,
-        [id]
-      );
-      return result.rowCount > 0;
-    } catch (error) {
-      console.error("Error deleting template:", error);
-      return false;
-    }
+    await db.delete(emailTemplates).where(eq(emailTemplates.id, id));
+    return true;
   }
   
   async listEmailTemplates(organizationId: number): Promise<EmailTemplate[]> {
@@ -544,8 +444,8 @@ export class DatabaseStorage implements IStorage {
         category: dbTemplate.category || null
       }));
     } catch (error) {
-      console.error("Error listing templates:", error);
-      return [];
+      console.error("Error fetching email templates:", error);
+      throw error;
     }
   }
   
@@ -591,21 +491,36 @@ export class DatabaseStorage implements IStorage {
   
   // Campaign methods
   async getCampaign(id: number): Promise<Campaign | undefined> {
-    const [campaign] = await db.select().from(campaigns).where(eq(campaigns.id, id));
-    return campaign;
+    try {
+      console.log(`Getting campaign with ID: ${id}`);
+      
+      const [campaign] = await db.select().from(campaigns).where(eq(campaigns.id, id));
+      
+      if (!campaign) {
+        console.log(`No campaign found with ID: ${id}`);
+        return undefined;
+      }
+      
+      console.log(`Campaign found:`, campaign);
+      return campaign;
+    } catch (error) {
+      console.error("Error getting campaign:", error);
+      throw error;
+    }
   }
   
   async createCampaign(organizationId: number, userId: number, campaign: InsertCampaign): Promise<Campaign> {
     const [newCampaign] = await db.insert(campaigns).values({
       name: campaign.name,
-      targetGroupId: Number(campaign.targetGroupId),
-      smtpProfileId: Number(campaign.smtpProfileId),
-      emailTemplateId: Number(campaign.emailTemplateId),
-      landingPageId: Number(campaign.landingPageId),
-      scheduledAt: campaign.scheduledAt ? new Date(campaign.scheduledAt) : null,
-      endDate: campaign.endDate ? new Date(campaign.endDate) : null,
-      createdById: userId,
+      targetGroupId: campaign.targetGroupId,
+      smtpProfileId: campaign.smtpProfileId,
+      emailTemplateId: campaign.emailTemplateId,
+      landingPageId: campaign.landingPageId,
+      scheduledAt: campaign.scheduledAt,
+      endDate: campaign.endDate,
+      status: "Draft",
       organizationId,
+      createdById: userId,
     }).returning();
     return newCampaign;
   }
@@ -636,21 +551,8 @@ export class DatabaseStorage implements IStorage {
     return result;
   }
   
-  async createCampaignResult(organizationId: number, result: InsertCampaignResult): Promise<CampaignResult> {
-    const [newResult] = await db.insert(campaignResults).values({
-      campaignId: result.campaignId,
-      targetId: result.targetId,
-      sent: result.sent,
-      sentAt: result.sentAt,
-      opened: result.opened,
-      openedAt: result.openedAt,
-      clicked: result.clicked,
-      clickedAt: result.clickedAt,
-      submitted: result.submitted,
-      submittedAt: result.submittedAt,
-      submittedData: result.submittedData,
-      organizationId,
-    }).returning();
+  async createCampaignResult(result: InsertCampaignResult): Promise<CampaignResult> {
+    const [newResult] = await db.insert(campaignResults).values(result).returning();
     return newResult;
   }
   
@@ -665,45 +567,174 @@ export class DatabaseStorage implements IStorage {
     return updatedResult;
   }
   
+  async deleteCampaignResult(id: number): Promise<boolean> {
+    await db.delete(campaignResults).where(eq(campaignResults.id, id));
+    return true;
+  }
+  
   async listCampaignResults(campaignId: number): Promise<CampaignResult[]> {
     return await db.select().from(campaignResults).where(eq(campaignResults.campaignId, campaignId));
   }
   
-  // Dashboard methods
+  // Password Reset Token methods
+  async createPasswordResetToken(token: InsertPasswordResetToken): Promise<PasswordResetToken> {
+    const [newToken] = await db.insert(passwordResetTokens).values(token).returning();
+    return newToken;
+  }
+  
+  async getPasswordResetToken(token: string): Promise<PasswordResetToken | undefined> {
+    const [resetToken] = await db.select().from(passwordResetTokens).where(eq(passwordResetTokens.token, token));
+    return resetToken;
+  }
+  
+  async deletePasswordResetToken(token: string): Promise<boolean> {
+    await db.delete(passwordResetTokens).where(eq(passwordResetTokens.token, token));
+    return true;
+  }
+  
+  // Dashboard stats
   async getDashboardStats(organizationId: number): Promise<any> {
-    // Get count of active campaigns
-    const activeCampaigns = await db
-      .select({ count: count() })
+    try {
+      // Get campaign stats
+      const campaignStats = await db.select({
+        status: campaigns.status,
+        count: sql<number>`count(*)`.as('count'),
+      })
       .from(campaigns)
-      .where(and(
-        eq(campaigns.organizationId, organizationId),
-        eq(campaigns.status, "Active")
-      ));
-    
-    // Get user count
-    const userCount = await db
-      .select({ count: count() })
-      .from(users)
-      .where(eq(users.organizationId, organizationId));
-    
-    // Get campaign metrics
-    // In a real implementation, you would calculate more detailed metrics
-    // For now, we'll return a simple mock data
-    
-    return {
-      activeCampaigns: Number(activeCampaigns[0].count) || 0,
-      campaignChange: 12, // Mock data
-      successRate: 32.8, // Mock data
-      successRateChange: 5.2, // Mock data
-      totalUsers: Number(userCount[0].count) || 0,
-      newUsers: 3, // Mock data
-      trainingCompletion: 78, // Mock data
-      trainingCompletionChange: 8, // Mock data
-    };
+      .where(eq(campaigns.organizationId, organizationId))
+      .groupBy(campaigns.status);
+      
+      // Get total users in organization
+      const totalUsers = await db.select({ count: sql<number>`count(*)`.as('count') })
+        .from(users)
+        .where(eq(users.organizationId, organizationId));
+      
+      // Get total groups
+      const totalGroups = await db.select({ count: sql<number>`count(*)`.as('count') })
+        .from(groups)
+        .where(eq(groups.organizationId, organizationId));
+      
+      // Get campaign results for success rate - fix the variable name issue
+      const results = await db.select({
+        status: campaignResults.status,
+        count: sql<number>`count(*)`.as('count'),
+      })
+      .from(campaignResults)
+      .innerJoin(campaigns, eq(campaignResults.campaignId, campaigns.id))
+      .where(eq(campaigns.organizationId, organizationId))
+      .groupBy(campaignResults.status);
+      
+      // Calculate metrics
+      const activeCampaigns = campaignStats.find(s => s.status === 'Active')?.count || 0;
+      const totalCampaigns = campaignStats.reduce((sum, s) => sum + s.count, 0);
+      
+      const totalClicks = results.find(r => r.status === 'clicked')?.count || 0;
+      const totalSent = results.reduce((sum, r) => sum + r.count, 0);
+      const successRate = totalSent > 0 ? Math.round((totalClicks / totalSent) * 100) : 0;
+      
+      // Get recent campaign changes (last 30 days)
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      
+      const recentCampaigns = await db.select({ count: sql<number>`count(*)`.as('count') })
+        .from(campaigns)
+        .where(
+          and(
+            eq(campaigns.organizationId, organizationId),
+            gte(campaigns.createdAt, thirtyDaysAgo)
+          )
+        );
+      
+      return {
+        activeCampaigns,
+        totalCampaigns,
+        successRate,
+        totalUsers: totalUsers[0]?.count || 0,
+        totalGroups: totalGroups[0]?.count || 0,
+        campaignChange: recentCampaigns[0]?.count || 0,
+        successRateChange: 0,
+        newUsers: 0,
+        trainingCompletion: 75,
+        trainingCompletionChange: 5,
+      };
+    } catch (error) {
+      console.error("Error getting dashboard stats:", error);
+      throw error;
+    }
+  }
+
+  async getPhishingMetrics(organizationId: number): Promise<any[]> {
+    try {
+      // Get last 6 months of data
+      const sixMonthsAgo = new Date();
+      sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+      
+      const metrics = await db.select({
+        month: sql<string>`DATE_TRUNC('month', ${campaigns.createdAt})`.as('month'),
+        sent: sql<number>`count(CASE WHEN ${campaignResults.status} = 'sent' THEN 1 END)`.as('sent'),
+        opened: sql<number>`count(CASE WHEN ${campaignResults.status} = 'opened' THEN 1 END)`.as('opened'),
+        clicked: sql<number>`count(CASE WHEN ${campaignResults.status} = 'clicked' THEN 1 END)`.as('clicked'),
+        submitted: sql<number>`count(CASE WHEN ${campaignResults.status} = 'submitted' THEN 1 END)`.as('submitted'),
+      })
+      .from(campaigns)
+      .leftJoin(campaignResults, eq(campaigns.id, campaignResults.campaignId))
+      .where(
+        and(
+          eq(campaigns.organizationId, organizationId),
+          gte(campaigns.createdAt, sixMonthsAgo)
+        )
+      )
+      .groupBy(sql`DATE_TRUNC('month', ${campaigns.createdAt})`)
+      .orderBy(sql`DATE_TRUNC('month', ${campaigns.createdAt})`);
+      
+      return metrics.map(m => ({
+        date: new Date(m.month).toLocaleDateString('en-US', { month: 'short' }),
+        sent: m.sent,
+        opened: m.opened,
+        clicked: m.clicked,
+        submitted: m.submitted,
+        rate: m.sent > 0 ? Math.round((m.clicked / m.sent) * 100) : 0,
+      }));
+    } catch (error) {
+      console.error("Error getting phishing metrics:", error);
+      return [];
+    }
+  }
+
+  async getAtRiskUsers(organizationId: number): Promise<any[]> {
+    try {
+      // Get users who clicked or submitted in recent campaigns
+      const riskUsers = await db.select({
+        targetId: targets.id,
+        firstName: targets.firstName,
+        lastName: targets.lastName,
+        email: targets.email,
+        department: targets.department,
+        riskScore: sql<number>`count(CASE WHEN ${campaignResults.status} IN ('clicked', 'submitted') THEN 1 END)`.as('riskScore'),
+      })
+      .from(targets)
+      .innerJoin(groups, eq(targets.groupId, groups.id))
+      .leftJoin(campaignResults, eq(targets.id, campaignResults.targetId))
+      .where(eq(groups.organizationId, organizationId))
+      .groupBy(targets.id, targets.firstName, targets.lastName, targets.email, targets.department)
+      .having(sql`count(CASE WHEN ${campaignResults.status} IN ('clicked', 'submitted') THEN 1 END) > 0`)
+      .orderBy(sql`count(CASE WHEN ${campaignResults.status} IN ('clicked', 'submitted') THEN 1 END) DESC`)
+      .limit(10);
+      
+      return riskUsers.map(user => ({
+        id: user.targetId,
+        name: `${user.firstName} ${user.lastName}`,
+        department: user.department || 'Unknown',
+        riskLevel: user.riskScore >= 3 ? 'High Risk' : user.riskScore >= 2 ? 'Medium Risk' : 'Low Risk',
+        riskScore: user.riskScore,
+      }));
+    } catch (error) {
+      console.error("Error getting at-risk users:", error);
+      return [];
+    }
   }
 }
 
-// Export singleton instance
 export const storage = new DatabaseStorage();
 
 

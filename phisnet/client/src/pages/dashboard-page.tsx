@@ -11,8 +11,80 @@ import {
   Activity, 
   ChartLine, 
   Users, 
-  GraduationCap 
+  GraduationCap,
+  Bell, 
+  AlertTriangle, 
+  Info, 
+  CheckCircle 
 } from "lucide-react";
+import { apiRequest } from "@/lib/queryClient";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { formatDistanceToNow } from "date-fns";
+
+function RecentNotifications() {
+  const { data: notificationData } = useQuery({
+    queryKey: ['/api/notifications'],
+    queryFn: async () => {
+      const response = await apiRequest('GET', '/api/notifications?limit=5');
+      return await response.json();
+    },
+  });
+
+  const notifications = notificationData?.notifications || [];
+
+  const getIconForType = (type: string, priority: string) => {
+    if (priority === 'urgent' || priority === 'high') {
+      return <AlertTriangle className="h-4 w-4 text-red-500" />;
+    }
+    
+    switch (type) {
+      case 'campaign': return <Bell className="h-4 w-4 text-blue-500" />;
+      case 'security': return <AlertTriangle className="h-4 w-4 text-orange-500" />;
+      case 'system': return <Info className="h-4 w-4 text-gray-500" />;
+      case 'training': return <CheckCircle className="h-4 w-4 text-green-500" />;
+      default: return <Bell className="h-4 w-4 text-blue-500" />;
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base flex items-center gap-2">
+          <Bell className="h-4 w-4" />
+          Recent Notifications
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {notifications.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-4">
+            No recent notifications
+          </p>
+        ) : (
+          <div className="space-y-3">
+            {notifications.map((notification: any) => (
+              <div key={notification.id} className="flex items-start gap-3">
+                {getIconForType(notification.type, notification.priority)}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium">{notification.title}</p>
+                  <p className="text-xs text-muted-foreground line-clamp-1">
+                    {notification.message}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {formatDistanceToNow(new Date(notification.createdAt), { addSuffix: true })}
+                  </p>
+                </div>
+              </div>
+            ))}
+            <Button variant="outline" size="sm" className="w-full mt-3">
+              View All Notifications
+            </Button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -91,6 +163,10 @@ export default function DashboardPage() {
         <ThreatLandscape threats={threatData} />
         <AtRiskUsers users={riskUsers} />
         <SecurityTraining trainings={trainingData} />
+      </div>
+
+      <div className="mt-6">
+        <RecentNotifications />
       </div>
     </AppLayout>
   );

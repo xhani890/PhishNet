@@ -33,9 +33,8 @@ interface LandingPageEditorProps {
 export default function LandingPageEditor({ onClose, page }: LandingPageEditorProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [isCloning, setIsCloning] = useState(false);
   const [urlToClone, setUrlToClone] = useState("");
-  const [isCloningUrl, setIsCloningUrl] = useState(false);
+  const [isCloning, setIsCloning] = useState(false);
   const [activeTab, setActiveTab] = useState<string>("editor");
   const [thumbnailSource, setThumbnailSource] = useState<string | null>(null);
   const previewFrameRef = useRef<HTMLIFrameElement>(null);
@@ -85,79 +84,50 @@ export default function LandingPageEditor({ onClose, page }: LandingPageEditorPr
     },
   });
 
-  const handleCloneWebsite = async () => {
-    if (!urlToClone) {
+  const cloneMutation = useMutation({
+    mutationFn: async (url: string) => {
+      const response = await apiRequest('POST', '/api/landing-pages/clone', { url });
+      return await response.json();
+    },
+    onSuccess: (data) => {
+      form.setValue("htmlContent", data.html);
+      form.setValue("name", data.title || "Cloned Website");
+      setIsCloning(false);
+      setUrlToClone("");
       toast({
-        title: "URL required",
-        description: "Please enter a URL to clone",
+        title: "Website cloned successfully",
+        description: "The website content has been imported into the editor.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Failed to clone website",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleCloneWebsite = () => {
+    if (!urlToClone.trim()) {
+      toast({
+        title: "URL Required",
+        description: "Please enter a valid URL to clone.",
         variant: "destructive",
       });
       return;
     }
-
-    setIsCloningUrl(true);
+    
+    // Basic URL validation
     try {
-      // Request the server to fetch the webpage
-      const res = await fetch("/api/landing-pages/clone", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include",
-        body: JSON.stringify({ url: urlToClone })
-      });
-      
-      // First check if the response is OK
-      if (!res.ok) {
-        // Try to get error message
-        let errorMessage;
-        const contentType = res.headers.get("content-type");
-        
-        if (contentType && contentType.includes("application/json")) {
-          // If it's JSON, parse it
-          const errorData = await res.json();
-          errorMessage = errorData.message || "Failed to clone website";
-        } else {
-          // Otherwise get text
-          errorMessage = await res.text() || "Failed to clone website";
-        }
-        throw new Error(errorMessage);
-      }
-      
-      // Parse response as JSON
-      const data = await res.json();
-      
-      // Update the form with the cloned content
-      form.setValue("htmlContent", data.htmlContent);
-      
-      // Try to extract title for the name
-      const titleMatch = data.htmlContent.match(/<title>(.*?)<\/title>/i);
-      if (titleMatch && titleMatch[1] && !form.getValues("name")) {
-        form.setValue("name", titleMatch[1]);
-      }
-      
-      setIsCloning(false);
-      setActiveTab("preview");
-      
+      new URL(urlToClone);
+      cloneMutation.mutate(urlToClone);
+    } catch {
       toast({
-        title: "Website cloned",
-        description: "The website has been cloned successfully. You can now customize it.",
-      });
-
-      // Extract thumbnail after cloning
-      setTimeout(() => {
-        extractThumbnail();
-      }, 500);
-      
-    } catch (error) {
-      console.error("Clone error:", error);
-      toast({
-        title: "Failed to clone website",
-        description: error.message || "An error occurred while cloning the website",
+        title: "Invalid URL",
+        description: "Please enter a valid URL (e.g., https://example.com).",
         variant: "destructive",
       });
-    } finally {
-      setIsCloningUrl(false);
     }
   };
 
@@ -231,38 +201,52 @@ export default function LandingPageEditor({ onClose, page }: LandingPageEditorPr
       <div className="flex-1 overflow-y-auto pr-2">
         {isCloning ? (
           <div className="space-y-4">
-            <h2 className="text-lg font-medium">Clone Website</h2>
-            <p className="text-sm text-muted-foreground">
-              Enter the URL of the website you want to clone. We'll fetch the HTML content for you.
-            </p>
-            
-            <div className="flex space-x-2">
-              <Input
-                type="url"
-                placeholder="https://example.com"
-                value={urlToClone}
-                onChange={(e) => setUrlToClone(e.target.value)}
-                className="flex-1"
-              />
-              <Button 
-                onClick={handleCloneWebsite}
-                disabled={isCloningUrl}
-              >
-                {isCloningUrl ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Cloning...
-                  </>
-                ) : (
-                  <>Clone</>
-                )}
-              </Button>
+            <div className="flex items-center gap-2">
+              <Globe className="h-4 w-4" />
+              <h3 className="font-medium">Clone Website</h3>
             </div>
-            
-            <div className="flex justify-end space-x-2 pt-4">
-              <Button variant="outline" onClick={() => setIsCloning(false)}>
-                Cancel
-              </Button>
+            <div className="space-y-3">
+              <div>
+                <FormLabel>Website URL</FormLabel>
+                <FormControl>
+                  <Input
+                    placeholder="https://example.com"
+                    value={urlToClone}
+                    onChange={(e) => setUrlToClone(e.target.value)}
+                  />
+                </FormControl>
+                <FormMessage />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Enter the URL of the website you want to clone
+                </p>
+              </div>
+              
+              <div className="flex gap-2">
+                <Button 
+                  onClick={handleCloneWebsite}
+                  disabled={cloneMutation.isPending}
+                  size="sm"
+                >
+                  {cloneMutation.isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Cloning...
+                    </>
+                  ) : (
+                    <>
+                      <Globe className="mr-2 h-4 w-4" />
+                      Clone Website
+                    </>
+                  )}
+                </Button>
+                <Button 
+                  variant="outline" 
+                  onClick={() => setIsCloning(false)}
+                  size="sm"
+                >
+                  Cancel
+                </Button>
+              </div>
             </div>
           </div>
         ) : (
