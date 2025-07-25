@@ -174,7 +174,7 @@ function Set-Database {
         $env:PGPASSWORD = "postgres"
         
         & psql -U postgres -h localhost -c "CREATE DATABASE phishnet_db;" 2>$null
-        & psql -U postgres -h localhost -c "CREATE USER phishnet_user WITH PASSWORD 'secure_password_123';" 2>$null
+        & psql -U postgres -h localhost -c "CREATE USER phishnet_user WITH PASSWORD 'phishnet_password';" 2>$null
         & psql -U postgres -h localhost -c "GRANT ALL PRIVILEGES ON DATABASE phishnet_db TO phishnet_user;" 2>$null
         & psql -U postgres -h localhost -c "ALTER USER phishnet_user CREATEDB;" 2>$null
         
@@ -287,7 +287,7 @@ param([string]`$BackupDir = ".\backups")
 New-Item -ItemType Directory -Path `$BackupDir -Force | Out-Null
 
 # Backup database
-`$env:PGPASSWORD = "secure_password_123"
+`$env:PGPASSWORD = "phishnet_password"
 pg_dump -U `$DBUser -h localhost `$DBName > "`$BackupDir\db_backup_`$Date.sql"
 
 # Backup uploads

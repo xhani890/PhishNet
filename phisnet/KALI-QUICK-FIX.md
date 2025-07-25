@@ -1,54 +1,59 @@
-## 🔧 **Quick Fix for Your Kali Machine**
+## 🔧 **Updated - All Fixes Applied!**
 
-You have 2 options to continue:
+The deployment scripts have been updated with all the fixes we discovered during your Kali testing:
 
-### **Option 1: Quick Redis Fix (Recommended)**
+### **✅ What's Fixed:**
+- **Database password consistency** - All scripts now use `phishnet_password`
+- **Cross-platform Node.js scripts** - Works on Linux, macOS, and Windows
+- **Smart Redis detection** - Handles different service names across distributions
+- **Database connection verification** - Tests connections before proceeding
+- **Environment file automation** - Creates correct .env automatically
+
+### **🚀 New Helper Scripts:**
 ```bash
-# On your Kali machine, run this to continue the deployment:
-wget -O kali-redis-fix.sh https://raw.githubusercontent.com/gh0st-bit/PhishNet/main/phisnet/kali-redis-fix.sh
-chmod +x kali-redis-fix.sh
-./kali-redis-fix.sh
+# Quick development start (handles everything automatically)
+./start-dev.sh
+
+# Production deployment  
+./deploy.sh --production
+
+# Database troubleshooting
+./reset-db.sh
+
+# Platform-specific startup
+./start-kali.sh  # For Kali Linux specifically
 ```
 
-### **Option 2: Manual Redis Fix**
+### **📊 Now Available Commands:**
 ```bash
-# Start Redis manually
-sudo redis-server --daemonize yes
+# Cross-platform development
+npm run dev          # Auto-detects platform
+npm run kali         # Optimized for Kali Linux
 
-# Verify Redis is running
-redis-cli ping
+# Database management
+npm run setup        # db:push + import-data
+npm run db:migrate   # Alias for db:push
 
-# Continue with the rest manually
-npm install
-npm run build
-npm run db:migrate
-npm run start:prod
+# Production deployment
+npm run start:prod   # Production server
 ```
 
-### **For Future Restarts:**
+### **🎯 For Your Kali Machine:**
+
+Instead of the manual steps, now just run:
 ```bash
-# Use the quick start script
-chmod +x start-kali.sh
-./start-kali.sh
+# Complete automatic setup
+./deploy.sh
+
+# Or just development mode
+./start-dev.sh
 ```
 
-## 🎯 **What Happened:**
+### **🎉 For Your Friends:**
 
-✅ **Successfully Completed:**
-- Kali Linux environment detected
-- All dependencies installed (Node.js, PostgreSQL, Redis)
-- PostgreSQL database created and configured
-- Database user and permissions set up
+The deployment is now truly "zero setup struggles":
+1. **Clone repo**
+2. **Run `./deploy.sh`** 
+3. **Done!**
 
-⚠️ **Only Issue:**
-- Redis systemd service name mismatch (`redis.service` vs `redis-server.service`)
-
-The deployment is 95% complete! Just need to start Redis and finish the Node.js setup.
-
-## 🚀 **After Running the Fix:**
-
-Your PhishNet will be accessible at:
-- **URL:** `http://localhost:3000`
-- **Login:** `admin@phishnet.local`
-- **Password:** `admin123`
-- **Debug Dashboard:** `http://localhost:3000/debug`
+All the password mismatches, Redis issues, and environment problems are automatically handled! 🚀

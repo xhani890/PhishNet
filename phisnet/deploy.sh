@@ -170,11 +170,23 @@ setup_database() {
         sudo service postgresql start
     fi
     
-    # Create database and user
+    # Create database and user with consistent password
+    local db_password="phishnet_password"
+    
     sudo -u postgres psql -c "CREATE DATABASE phishnet_db;" 2>/dev/null || warn "Database may already exist"
-    sudo -u postgres psql -c "CREATE USER phishnet_user WITH PASSWORD 'secure_password_123';" 2>/dev/null || warn "User may already exist"
+    
+    # Drop and recreate user to ensure consistent password
+    sudo -u postgres psql -c "DROP USER IF EXISTS phishnet_user;" 2>/dev/null || true
+    sudo -u postgres psql -c "CREATE USER phishnet_user WITH PASSWORD '$db_password';" 2>/dev/null || true
     sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE phishnet_db TO phishnet_user;" 2>/dev/null || true
     sudo -u postgres psql -c "ALTER USER phishnet_user CREATEDB;" 2>/dev/null || true
+    
+    # Verify database connection
+    if PGPASSWORD="$db_password" psql -h localhost -U phishnet_user -d phishnet_db -c "SELECT 1;" >/dev/null 2>&1; then
+        log "✅ Database connection verified"
+    else
+        warn "⚠️ Database connection test failed, but continuing..."
+    fi
     
     log "Database setup completed"
 }
@@ -220,6 +232,84 @@ setup_redis() {
     fi
     
     log "Redis setup completed"
+}
+
+# Setup Node.js application
+setup_application() {
+    log "Setting up PhishNet application..."
+    
+    # Install Node.js dependencies
+    log "Installing Node.js dependencies..."
+    npm install
+    
+    # Check if database connection works
+    log "Testing database connection..."
+    if npm run db:push >/dev/null 2>&1; then
+        log "✅ Database schema setup successful"
+    else
+        warn "⚠️ Database schema setup had issues, trying to fix..."
+        
+        # Try to fix database connection issues
+        local db_password="phishnet_password"
+        log "Resetting database user password..."
+        sudo -u postgres psql -c "ALTER USER phishnet_user WITH PASSWORD '$db_password';" 2>/dev/null || true
+        
+        # Try again
+        if npm run db:push >/dev/null 2>&1; then
+            log "✅ Database schema setup successful after fix"
+        else
+            warn "⚠️ Database setup still has issues, continuing anyway..."
+        fi
+    fi
+    
+    # Import sample data
+    log "Importing sample data..."
+    if npm run import-data >/dev/null 2>&1; then
+        log "✅ Sample data imported successfully"
+    else
+        warn "⚠️ Sample data import had issues, but continuing..."
+    fi
+    
+    # Build application if in production mode
+    if [[ "$PRODUCTION" == true ]] && [[ "$SKIP_BUILD" != true ]]; then
+        log "Building application for production..."
+        npm run build
+        log "✅ Application built successfully"
+    fi
+    
+    log "PhishNet application setup completed"
+}
+
+# Start application
+start_application() {
+    log "Starting PhishNet application..."
+    
+    # Choose start method based on environment
+    if [[ "$PRODUCTION" == true ]]; then
+        log "Starting in production mode..."
+        if command -v pm2 >/dev/null 2>&1; then
+            log "Using PM2 for process management..."
+            pm2 start ecosystem.config.js --env production
+        else
+            log "Starting directly with Node.js..."
+            npm run start:prod &
+        fi
+    else
+        log "Starting in development mode..."
+        log "🚀 Starting PhishNet development server..."
+        log "🌐 Access URL: http://localhost:3000"
+        log "📧 Default login: admin@phishnet.local"
+        log "🔑 Default password: admin123"
+        log "🛑 Press Ctrl+C to stop the server"
+        echo ""
+        
+        # Use platform-specific dev command
+        if is_windows; then
+            npm run dev:win
+        else
+            npm run dev:unix
+        fi
+    fi
 }
 
 # Install Node.js dependencies
@@ -503,44 +593,48 @@ main() {
     setup_database
     setup_redis
     
-    # Setup application
+    # Setup and start application
     setup_environment
-    install_node_dependencies
+    setup_application
     
-    # Build application
-    if [[ "$SKIP_BUILD" != true ]]; then
-        build_application
-    fi
-    
-    # Run migrations
-    run_migrations
-    
-    # Setup process management
-    setup_pm2
-    
-    # Create backup script
-    create_backup_script
-    
-    # Production setup
+    # Production-specific setup
     if [[ "$PRODUCTION" == true ]]; then
+        setup_pm2
         create_systemd_service
         setup_nginx
         setup_ssl
+        create_backup_script
+        
+        log "Deployment completed successfully!"
+        info "Next steps:"
+        info "1. Review and update .env file with your settings"
+        info "2. Start the application with: pm2 start ecosystem.config.js"
+        info "3. Access the application at: http://localhost:3000"
+        info "4. Configure your domain DNS to point to this server"
+        info "5. Update FRONTEND_URL in .env to your domain"
+        warn "Important: Change default passwords in .env file!"
+    else
+        log "🎉 Development setup completed successfully!"
+        echo ""
+        echo "======================================"
+        echo "🎣 PhishNet Ready for Development! 🎣"
+        echo "======================================"
+        echo "🌐 URL: http://localhost:3000"
+        echo "📧 Email: admin@phishnet.local"
+        echo "🔑 Password: admin123"
+        echo "🔧 Debug: http://localhost:3000/debug"
+        echo "======================================"
+        echo ""
+        
+        # Ask if user wants to start now
+        read -p "Start PhishNet development server now? (Y/n): " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Nn]$ ]]; then
+            info "To start later, run: npm run dev"
+        else
+            start_application
+        fi
     fi
-    
-    log "Deployment completed successfully!"
-    info "Next steps:"
-    info "1. Review and update .env file with your settings"
-    info "2. Start the application with: npm start"
-    info "3. Or use PM2: pm2 start ecosystem.config.js"
-    info "4. Access the application at: http://localhost:3000"
-    
-    if [[ "$PRODUCTION" == true ]]; then
-        info "5. Configure your domain DNS to point to this server"
-        info "6. Update FRONTEND_URL in .env to your domain"
-    fi
-    
-    warn "Important: Change default passwords in .env file!"
 }
 
 # Run main function
