@@ -28,6 +28,7 @@ import { eq, and, or, desc, asc, count, sql, gte, lte, isNull, isNotNull } from 
 import multer from "multer";
 import Papa from "papaparse";
 import { z } from "zod";
+import { errorHandler, assertUser, mapDatabaseFields } from './error-handler';
 import { NotificationService } from './services/notification-service';
 import { exportReportToCsv } from './utils/report-exporter';
 import path from 'path';
@@ -66,6 +67,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Dashboard Stats - Real Data
   app.get("/api/dashboard/stats", isAuthenticated, hasOrganization, async (req, res) => {
     try {
+      assertUser(req.user);
       const stats = await storage.getDashboardStats(req.user.organizationId);
       res.json(stats);
     } catch (error) {
@@ -77,6 +79,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Dashboard Metrics - Real Data
   app.get("/api/dashboard/metrics", isAuthenticated, hasOrganization, async (req, res) => {
     try {
+      assertUser(req.user);
       const metrics = await storage.getPhishingMetrics(req.user.organizationId);
       res.json(metrics);
     } catch (error) {
@@ -88,6 +91,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // At-Risk Users - Real Data
   app.get("/api/dashboard/risk-users", isAuthenticated, hasOrganization, async (req, res) => {
     try {
+      assertUser(req.user);
       const riskUsers = await storage.getAtRiskUsers(req.user.organizationId);
       res.json(riskUsers);
     } catch (error) {
@@ -99,6 +103,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Threat Landscape - Real Data
   app.get("/api/dashboard/threats", isAuthenticated, hasOrganization, async (req, res) => {
     try {
+      assertUser(req.user);
       // Get campaign types and their success rates - with proper error handling
       const threats = await db.select({
         type: sql<string>`COALESCE(${emailTemplates.type}, 'Unknown')`.as('type'),
@@ -188,6 +193,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Recent Campaigns
   app.get("/api/campaigns/recent", isAuthenticated, hasOrganization, async (req, res) => {
     try {
+      assertUser(req.user);
       const campaigns = await storage.listCampaigns(req.user.organizationId);
       // Sort by created date and take the most recent 5
       const recentCampaigns = campaigns
@@ -210,6 +216,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Groups Endpoints
   app.get("/api/groups", isAuthenticated, hasOrganization, async (req, res) => {
     try {
+      assertUser(req.user);
       const groups = await storage.listGroups(req.user.organizationId);
       res.json(groups);
     } catch (error) {
@@ -219,8 +226,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/groups", isAuthenticated, hasOrganization, async (req, res) => {
     try {
+      assertUser(req.user);
       const validatedData = insertGroupSchema.parse(req.body);
-      const group = await storage.createGroup(req.user.organizationId, validatedData);
+      // Add organizationId to the validated data
+      const groupData = {
+        ...validatedData,
+        organizationId: req.user.organizationId
+      };
+      const group = await storage.createGroup(req.user.organizationId, groupData);
       res.status(201).json(group);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -232,6 +245,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put("/api/groups/:id", isAuthenticated, async (req, res) => {
     try {
+      assertUser(req.user);
       const groupId = parseInt(req.params.id);
       const group = await storage.getGroup(groupId);
       
@@ -257,6 +271,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/groups/:id", isAuthenticated, async (req, res) => {
     try {
+      assertUser(req.user);
       const groupId = parseInt(req.params.id);
       const group = await storage.getGroup(groupId);
       
@@ -279,6 +294,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Targets Endpoints
   app.get("/api/groups/:id/targets", isAuthenticated, async (req, res) => {
     try {
+      assertUser(req.user);
       const groupId = parseInt(req.params.id);
       const group = await storage.getGroup(groupId);
       
@@ -300,6 +316,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/groups/:id/targets", isAuthenticated, async (req, res) => {
     try {
+      assertUser(req.user);
       const groupId = parseInt(req.params.id);
       const group = await storage.getGroup(groupId);
       
@@ -313,7 +330,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const validatedData = insertTargetSchema.parse(req.body);
-      const target = await storage.createTarget(req.user.organizationId, groupId, validatedData);
+      const targetData = {
+        ...validatedData,
+        organizationId: req.user.organizationId,
+        groupId: groupId
+      };
+      const target = await storage.createTarget(req.user.organizationId, groupId, targetData);
       res.status(201).json(target);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -325,6 +347,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/groups/:id/import", isAuthenticated, upload.single('file'), async (req, res) => {
     try {
+      assertUser(req.user);
       const groupId = parseInt(req.params.id);
       const group = await storage.getGroup(groupId);
       
@@ -351,11 +374,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const importedTargets = [];
       const errors = [];
       
-      for (const [index, row] of results.data.entries()) {
+      for (let index = 0; index < results.data.length; index++) {
+        const row = results.data[index];
         try {
           // Normalize field names
           const normalizedRow: any = {};
-          for (const [key, value] of Object.entries(row)) {
+          for (const [key, value] of Object.entries(row as Record<string, unknown>)) {
             const lowercaseKey = key.toLowerCase();
             if (lowercaseKey === 'firstname' || lowercaseKey === 'first_name') {
               normalizedRow.firstName = value;
@@ -371,8 +395,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Validate the data
           const validatedData = insertTargetSchema.parse(normalizedRow);
           
-          // Create the target
-          const target = await storage.createTarget(req.user.organizationId, groupId, validatedData);
+          // Create the target with required properties
+          const targetData = {
+            ...validatedData,
+            organizationId: req.user.organizationId,
+            groupId: groupId
+          };
+          const target = await storage.createTarget(req.user.organizationId, groupId, targetData);
           importedTargets.push(target);
         } catch (error) {
           errors.push({
@@ -395,6 +424,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // SMTP Profiles Endpoints
   app.get("/api/smtp-profiles", isAuthenticated, async (req, res) => {
     try {
+      assertUser(req.user);
       const profiles = await storage.listSmtpProfiles(req.user.organizationId);
       res.json(profiles);
     } catch (error) {
@@ -404,8 +434,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/smtp-profiles", isAuthenticated, async (req, res) => {
     try {
+      assertUser(req.user);
       const validatedData = insertSmtpProfileSchema.parse(req.body);
-      const profile = await storage.createSmtpProfile(req.user.organizationId, validatedData);
+      const profileData = {
+        ...validatedData,
+        organizationId: req.user.organizationId
+      };
+      const profile = await storage.createSmtpProfile(req.user.organizationId, profileData);
       res.status(201).json(profile);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -418,6 +453,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Email Templates Endpoints
   app.get("/api/email-templates", isAuthenticated, hasOrganization, async (req, res) => {
     try {
+      assertUser(req.user);
       // Get templates directly from storage 
       const templates = await storage.listEmailTemplates(req.user.organizationId);
       
@@ -449,6 +485,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/email-templates", isAuthenticated, hasOrganization, async (req, res) => {
     try {
+      assertUser(req.user);
       const validatedData = insertEmailTemplateSchema.parse(req.body);
       
       // Create a template using existing storage method
@@ -458,15 +495,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         {
           name: validatedData.name,
           subject: validatedData.subject,
-          // Fix the field mapping - add this line:
-          htmlContent: validatedData.html_content || validatedData.htmlContent || "<div>Default content</div>",
-          textContent: validatedData.text_content || validatedData.textContent,
-          senderName: validatedData.sender_name || validatedData.senderName,
-          senderEmail: validatedData.sender_email || validatedData.senderEmail,
+          // Fix the field mapping to match database schema:
+          html_content: validatedData.html_content || "<div>Default content</div>",
+          text_content: validatedData.text_content || null,
+          sender_name: validatedData.sender_name || "PhishNet Team",
+          sender_email: validatedData.sender_email || "phishing@example.com",
           type: validatedData.type,
           complexity: validatedData.complexity,
           description: validatedData.description,
-          category: validatedData.category
+          category: validatedData.category,
+          organization_id: req.user.organizationId
         }
       );
       
@@ -482,6 +520,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put("/api/email-templates/:id", isAuthenticated, async (req, res) => {
     try {
+      assertUser(req.user);
       const templateId = parseInt(req.params.id);
       const template = await storage.getEmailTemplate(templateId);
       
@@ -490,7 +529,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Ensure user has access to this template
-      if (template.organizationId !== req.user.organizationId) {
+      if (template.organization_id !== req.user.organizationId) {
         return res.status(403).json({ message: "Access denied" });
       }
       
@@ -507,6 +546,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   app.delete("/api/email-templates/:id", isAuthenticated, async (req, res) => {
     try {
+      assertUser(req.user);
       const templateId = parseInt(req.params.id);
       const template = await storage.getEmailTemplate(templateId);
       
@@ -515,7 +555,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Ensure user has access to this template
-      if (template.organizationId !== req.user.organizationId) {
+      if (template.organization_id !== req.user.organizationId) {
         return res.status(403).json({ message: "Access denied" });
       }
       
@@ -534,6 +574,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Landing Pages Endpoints
   app.get("/api/landing-pages", isAuthenticated, hasOrganization, async (req, res) => {
     try {
+      assertUser(req.user);
       const pages = await storage.listLandingPages(req.user.organizationId);
       res.json(pages);
     } catch (error) {
@@ -543,13 +584,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/landing-pages", isAuthenticated, hasOrganization, async (req, res) => {
     try {
+      assertUser(req.user);
       const validatedData = insertLandingPageSchema.parse(req.body);
       
       // Create the landing page with thumbnail
+      const pageData = {
+        ...validatedData,
+        organizationId: req.user.organizationId
+      };
       const page = await storage.createLandingPage(
-        req.user.organizationId, 
-        req.user.id, 
-        validatedData
+        req.user.organizationId,
+        req.user.id,
+        pageData
       );
       
       res.status(201).json(page);
@@ -653,7 +699,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } catch (error) {
         console.error("Error cloning website:", error);
         return res.status(400).json({ 
-          message: `Error fetching URL: ${error.message || "Unknown error"}` 
+          message: `Error fetching URL: ${(error as Error)?.message || "Unknown error"}` 
         });
       }
     } catch (error) {
@@ -735,6 +781,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         req.user.id, 
         {
           ...validatedData,
+          organizationId: req.user.organizationId,
           // Ensure proper type conversion
           targetGroupId: Number(validatedData.targetGroupId),
           smtpProfileId: Number(validatedData.smtpProfileId),
@@ -1403,6 +1450,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Error creating notifications" });
     }
   });
+
+  // Error statistics endpoint
+  app.get("/api/debug/errors", isAuthenticated, isAdmin, (req, res) => {
+    try {
+      const stats = errorHandler.getErrorStats();
+      res.json(stats);
+    } catch (error) {
+      res.status(500).json({ message: "Error fetching error statistics" });
+    }
+  });
+
+  // Clear error history endpoint
+  app.delete("/api/debug/errors", isAuthenticated, isAdmin, (req, res) => {
+    try {
+      errorHandler.clearHistory();
+      res.json({ message: "Error history cleared" });
+    } catch (error) {
+      res.status(500).json({ message: "Error clearing error history" });
+    }
+  });
+
+  // Add error handling middleware (must be last)
+  app.use(errorHandler.middleware);
 
   const httpServer = createServer(app);
   return httpServer;
