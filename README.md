@@ -1,4 +1,17 @@
-# 🎣 PhishNet - Advanced Phishing Simulation Platform
+# 🎣 PhishNet - Advance### ✨ What Makes PhishNet Special
+- **🤖 Intelligent Error Detection** - Automatica## 🔑 Default Access
+
+- **URL:** `http://localhost:3000`
+- **Email:** `admin@phishnet.local`
+- **Password:** `admin123`
+- **Debug Dashboard:** `http://localhost:3000/debug`
+
+**⚠️ Change the default password immediately after first login!**ects and suggests fixes for runtime issues
+- **🔧 Self-Healing Code** - Built-in error recovery and solution suggestions
+- **⚡ Universal Setup** - One command deployment on any platform
+- **📦 Zero Configuration** - Includes everything needed for production deployment
+- **🎣 Professional Grade** - Enterprise-ready phishing simulation engine
+- **🏢 Multi-Tenant Ready** - Built for organizations, MSPs, and consultantsing Simulation Platform
 
 <div align="center">
 
@@ -11,7 +24,7 @@
 [![Docker](https://img.shields.io/badge/docker-ready-blue)](https://www.docker.com/)
 [![PostgreSQL](https://img.shields.io/badge/postgresql-%3E%3D15-blue)](https://www.postgresql.org/)
 
-**🚀 Get Started in 5 Minutes** • **🐳 Docker Ready** • **🔒 Enterprise Security** • **📊 Advanced Analytics**
+**🚀 30-Second Setup** • **🤖 Auto Error Detection** • **� Self-Healing Code** • **� Zero Configuration**
 
 </div>
 
@@ -19,7 +32,7 @@
 
 ## 🌟 Overview
 
-PhishNet is a state-of-the-art phishing simulation and cybersecurity awareness platform designed to empower organizations with realistic phishing tests, comprehensive training modules, and advanced analytics to build a robust human firewall against cyber threats.
+PhishNet is a next-generation phishing simulation platform with **intelligent error detection** and **automatic fixing capabilities**. Built for cybersecurity professionals who need a robust, production-ready solution that **just works** out of the box.
 
 ### � Key Features
 - **🎣 Advanced Phishing Simulation Engine** with professional templates
@@ -31,40 +44,71 @@ PhishNet is a state-of-the-art phishing simulation and cybersecurity awareness p
 
 ---
 
-## ⚡ Quick Start
+## ⚡ 30-Second Setup
 
-### 🌐 Universal Setup (Recommended)
-**Automatically detects your environment and installs everything:**
+### 🚀 Super Quick Start (One Command)
+**Automatically sets up everything - dependencies, database, services:**
 
 #### Linux/macOS:
 ```bash
 git clone https://github.com/gh0st-bit/PhishNet.git
 cd PhishNet/phisnet
-chmod +x scripts/setup.sh
-./scripts/setup.sh
+./deploy.sh
 ```
 
-#### Windows:
+#### Windows (PowerShell as Admin):
 ```powershell
 git clone https://github.com/gh0st-bit/PhishNet.git
 cd PhishNet\phisnet
-.\scripts\setup.ps1
+.\deploy.ps1
 ```
 
-**🎯 Supports:**
+**🎯 Auto-Detects & Supports:**
 - 🐉 Kali Linux (with auto PostgreSQL fixes)
-- 🐧 Ubuntu/Debian • 🎩 CentOS/RHEL/Rocky
+- 🐧 Ubuntu/Debian • 🎩 CentOS/RHEL/Rocky  
 - 🎁 Fedora • ⚡ Arch/Manjaro
-- 🪟 Windows 10/11 • 🍎 macOS
+- 🪟 Windows 10/11 • 🍎 macOS Intel/ARM
 
-### 🐳 Docker Deployment
+### 🐳 Docker (Instant Deploy):
 ```bash
 git clone https://github.com/gh0st-bit/PhishNet.git
 cd PhishNet/phisnet
 docker-compose up -d
 ```
 
-**🎉 That's it!** Access PhishNet at `http://localhost:5173`
+**🎉 That's it!** Access PhishNet at `http://localhost:3000`
+
+---
+
+## 🤖 Intelligent Error Detection
+
+PhishNet includes a cutting-edge **runtime error detection system** that automatically identifies issues and provides intelligent solutions:
+
+### 🔍 Auto-Detection Features
+- **🚨 Real-Time Monitoring** - Continuous health checks and error detection
+- **🧠 Smart Diagnosis** - AI-powered error analysis with suggested fixes
+- **🔧 Auto-Recovery** - Automatic healing for common configuration issues
+- **📊 Debug Dashboard** - Visual debugging interface at `/debug`
+- **📈 Error Analytics** - Track and analyze error patterns over time
+
+### 🛠️ Self-Healing Capabilities
+```bash
+# Check system health anytime
+curl http://localhost:3000/health
+
+# View intelligent error diagnostics
+curl http://localhost:3000/api/errors/diagnose
+
+# Access debug dashboard
+open http://localhost:3000/debug
+```
+
+**💡 Smart Error Solutions:**
+- Database connection issues → Auto-retry with exponential backoff
+- Missing environment variables → Guided setup with examples
+- Port conflicts → Automatic port detection and switching
+- Permission errors → Platform-specific fix suggestions
+- Memory issues → Resource optimization recommendations
 
 ---
 
@@ -86,17 +130,21 @@ docker-compose up -d
 | **[⚡ Quick Start Guide](./phisnet/QUICKSTART.md)** | Get running in 5 minutes |
 | **[🔧 Installation Guide](./phisnet/INSTALLATION.md)** | Detailed setup instructions |
 | **[🚀 Deployment Guide](./phisnet/DEPLOYMENT.md)** | Production deployment |
+| **[🤖 Auto-Deploy Guide](./phisnet/README-DEPLOYMENT.md)** | Automated universal deployment |
+| **[📊 Error Detection](./phisnet/server/error-handler.ts)** | Intelligent error handling system |
 
 ---
 
 ## 🛠️ What's Included
 
 ### 📦 Complete Package
+- **🤖 Intelligent Error Detection** - Runtime monitoring and auto-healing capabilities
+- **🚀 Universal Deployment Scripts** - Automated setup for all platforms
 - **Database Schema** - Multi-tenant PostgreSQL with sample data
-- **Docker Setup** - Production-ready containerized deployment
+- **Docker Setup** - Production-ready containerized deployment  
 - **Sample Data** - 3 organizations, 7 users, professional templates
-- **Setup Scripts** - Automated installation for all platforms
 - **Security Features** - SSL ready, audit logging, RBAC
+- **Debug Dashboard** - Visual error tracking and system health monitoring
 
 ### 🏢 Sample Organizations
 - **Corporate** - Business environment simulation
@@ -146,8 +194,10 @@ docker-compose up -d
 - **🔐 Secure Authentication** - Bcrypt hashing, session management
 - **🛡️ Data Protection** - Input validation, XSS/CSRF protection
 - **📊 Audit Logging** - Comprehensive activity tracking
+- **🤖 Runtime Monitoring** - Intelligent error detection and auto-healing
 - **🏢 Multi-Tenancy** - Isolated organization environments
 - **🔒 RBAC** - Granular role-based permissions
+- **🚨 Real-Time Alerts** - Proactive system health monitoring
 
 ---
 
