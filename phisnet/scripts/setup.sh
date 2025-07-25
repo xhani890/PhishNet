@@ -4,7 +4,7 @@
 # PhishNet Complete Setup Script
 # Version: 1.0
 # Created: July 25, 2025
-# Description: Complete setup script for PhishNet project
+# Description: Universal setup script that adapts to different environments
 # ===============================================
 
 set -e  # Exit on any error
@@ -22,6 +22,13 @@ DB_NAME="phishnet"
 DB_USER="phishnet_user"
 DB_PASSWORD="kali"
 NODE_VERSION="18"
+
+# Environment detection
+OS_TYPE=""
+DISTRO=""
+PG_VERSION=""
+PG_SERVICE=""
+PG_HBA_FILE=""
 
 # Print colored output
 print_status() {
@@ -47,14 +54,289 @@ print_header() {
     echo "==============================================="
 }
 
+# Detect operating system and distribution
+detect_environment() {
+    print_header "Detecting Environment"
+    
+    # Detect OS type
+    if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+        OS_TYPE="linux"
+        if [ -f /etc/os-release ]; then
+            source /etc/os-release
+            DISTRO="$ID"
+            print_status "Detected Linux distribution: $NAME"
+        elif [ -f /etc/debian_version ]; then
+            DISTRO="debian"
+            print_status "Detected Debian-based system"
+        elif [ -f /etc/redhat-release ]; then
+            DISTRO="redhat"
+            print_status "Detected Red Hat-based system"
+        else
+            DISTRO="unknown"
+            print_warning "Unknown Linux distribution"
+        fi
+    elif [[ "$OSTYPE" == "darwin"* ]]; then
+        OS_TYPE="macos"
+        DISTRO="macos"
+        print_status "Detected macOS"
+    elif [[ "$OSTYPE" == "cygwin" ]] || [[ "$OSTYPE" == "msys" ]] || [[ "$OSTYPE" == "win32" ]]; then
+        OS_TYPE="windows"
+        DISTRO="windows"
+        print_status "Detected Windows (using $OSTYPE)"
+    else
+        OS_TYPE="unknown"
+        DISTRO="unknown"
+        print_warning "Unknown operating system: $OSTYPE"
+    fi
+    
+    # Detect PostgreSQL configuration
+    detect_postgresql_config
+}
+
+# Detect PostgreSQL configuration
+detect_postgresql_config() {
+    print_status "Detecting PostgreSQL configuration..."
+    
+    # Try to get PostgreSQL version
+    if command -v psql >/dev/null 2>&1; then
+        if sudo -u postgres psql -t -c "SELECT version();" 2>/dev/null | grep -q PostgreSQL; then
+            PG_VERSION=$(sudo -u postgres psql -t -c "SELECT version();" 2>/dev/null | grep -oE '[0-9]+\.[0-9]+' | head -1)
+        elif psql --version >/dev/null 2>&1; then
+            PG_VERSION=$(psql --version | grep -oE '[0-9]+\.[0-9]+' | head -1)
+        fi
+    fi
+    
+    if [ -z "$PG_VERSION" ]; then
+        PG_VERSION="15"  # Default fallback
+        print_warning "Could not detect PostgreSQL version, using default: $PG_VERSION"
+    else
+        print_status "Detected PostgreSQL version: $PG_VERSION"
+    fi
+    
+    # Determine PostgreSQL service name and config paths
+    case "$DISTRO" in
+        "kali"|"debian"|"ubuntu")
+            PG_SERVICE="postgresql"
+            PG_HBA_FILE="/etc/postgresql/$PG_VERSION/main/pg_hba.conf"
+            ;;
+        "centos"|"rhel"|"fedora"|"rocky"|"almalinux")
+            PG_SERVICE="postgresql-$PG_VERSION"
+            PG_HBA_FILE="/var/lib/pgsql/$PG_VERSION/data/pg_hba.conf"
+            ;;
+        "arch"|"manjaro")
+            PG_SERVICE="postgresql"
+            PG_HBA_FILE="/var/lib/postgres/data/pg_hba.conf"
+            ;;
+        "macos")
+            PG_SERVICE="postgresql@$PG_VERSION"
+            PG_HBA_FILE="/usr/local/var/postgres/pg_hba.conf"
+            # Also check homebrew path
+            if [ -f "/opt/homebrew/var/postgres/pg_hba.conf" ]; then
+                PG_HBA_FILE="/opt/homebrew/var/postgres/pg_hba.conf"
+            fi
+            ;;
+        *)
+            PG_SERVICE="postgresql"
+            # Try common locations
+            for conf in "/etc/postgresql/$PG_VERSION/main/pg_hba.conf" \
+                       "/var/lib/pgsql/$PG_VERSION/data/pg_hba.conf" \
+                       "/var/lib/postgres/data/pg_hba.conf" \
+                       "/usr/local/var/postgres/pg_hba.conf"; do
+                if [ -f "$conf" ]; then
+                    PG_HBA_FILE="$conf"
+                    break
+                fi
+            done
+            ;;
+    esac
+    
+    print_status "PostgreSQL service: $PG_SERVICE"
+    print_status "PostgreSQL config: $PG_HBA_FILE"
+}
+
 # Check if command exists
 command_exists() {
     command -v "$1" >/dev/null 2>&1
 }
 
-# Check system requirements
+# Install system dependencies based on OS
+install_system_dependencies() {
+    print_header "Installing System Dependencies"
+    
+    case "$DISTRO" in
+        "kali"|"debian"|"ubuntu")
+            print_status "Installing dependencies for Debian-based system..."
+            sudo apt-get update
+            sudo apt-get install -y curl git build-essential software-properties-common \
+                                  postgresql postgresql-contrib postgresql-client \
+                                  redis-server nginx ca-certificates gnupg lsb-release
+            ;;
+        "centos"|"rhel"|"rocky"|"almalinux")
+            print_status "Installing dependencies for RHEL-based system..."
+            sudo dnf update -y
+            sudo dnf install -y curl git gcc gcc-c++ make postgresql postgresql-server \
+                              postgresql-contrib redis nginx ca-certificates
+            # Initialize PostgreSQL if needed
+            if [ ! -f "/var/lib/pgsql/$PG_VERSION/data/postgresql.conf" ]; then
+                sudo postgresql-setup --initdb
+            fi
+            ;;
+        "fedora")
+            print_status "Installing dependencies for Fedora..."
+            sudo dnf update -y
+            sudo dnf install -y curl git gcc gcc-c++ make postgresql postgresql-server \
+                              postgresql-contrib redis nginx
+            # Initialize PostgreSQL if needed
+            if [ ! -f "/var/lib/pgsql/data/postgresql.conf" ]; then
+                sudo postgresql-setup --initdb
+            fi
+            ;;
+        "arch"|"manjaro")
+            print_status "Installing dependencies for Arch-based system..."
+            sudo pacman -Sy --noconfirm curl git base-devel postgresql redis nginx
+            # Initialize PostgreSQL if needed
+            if [ ! -d "/var/lib/postgres/data" ]; then
+                sudo -u postgres initdb -D /var/lib/postgres/data
+            fi
+            ;;
+        "macos")
+            print_status "Installing dependencies for macOS..."
+            if ! command_exists brew; then
+                print_error "Homebrew is required but not installed. Please install it first:"
+                print_error "https://brew.sh"
+                exit 1
+            fi
+            brew update
+            brew install postgresql@$PG_VERSION redis nginx
+            ;;
+        *)
+            print_warning "Unknown distribution. Attempting generic installation..."
+            if command_exists apt-get; then
+                sudo apt-get update
+                sudo apt-get install -y curl git build-essential postgresql postgresql-contrib redis-server nginx
+            elif command_exists dnf; then
+                sudo dnf install -y curl git gcc gcc-c++ make postgresql postgresql-server redis nginx
+            elif command_exists pacman; then
+                sudo pacman -Sy --noconfirm curl git base-devel postgresql redis nginx
+            else
+                print_error "No supported package manager found. Please install dependencies manually:"
+                print_error "- Node.js $NODE_VERSION+"
+                print_error "- PostgreSQL 15+"
+                print_error "- Redis"
+                print_error "- Nginx"
+                exit 1
+            fi
+            ;;
+    esac
+}
+
+# Install Node.js with version detection
+install_nodejs() {
+    print_header "Installing Node.js"
+    
+    if command_exists node; then
+        CURRENT_NODE_VERSION=$(node --version | cut -d'v' -f2 | cut -d'.' -f1)
+        if [ "$CURRENT_NODE_VERSION" -ge "$NODE_VERSION" ]; then
+            print_success "Node.js $(node --version) is already installed"
+            return 0
+        else
+            print_warning "Node.js $CURRENT_NODE_VERSION is installed but version $NODE_VERSION+ is required"
+        fi
+    fi
+    
+    print_status "Installing Node.js $NODE_VERSION..."
+    
+    case "$DISTRO" in
+        "macos")
+            if command_exists brew; then
+                brew install node@$NODE_VERSION
+            else
+                print_error "Homebrew required for Node.js installation on macOS"
+                exit 1
+            fi
+            ;;
+        *)
+            # Use NodeSource repository for most Linux distributions
+            if command_exists curl; then
+                curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | sudo -E bash -
+                if command_exists apt-get; then
+                    sudo apt-get install -y nodejs
+                elif command_exists dnf; then
+                    sudo dnf install -y nodejs npm
+                elif command_exists pacman; then
+                    sudo pacman -S --noconfirm nodejs npm
+                fi
+            else
+                print_error "curl is required to install Node.js"
+                exit 1
+            fi
+            ;;
+    esac
+    
+    # Verify installation
+    if command_exists node && command_exists npm; then
+        print_success "Node.js $(node --version) and npm $(npm --version) installed successfully"
+    else
+        print_error "Failed to install Node.js"
+        exit 1
+    fi
+}
+
+# Start and enable services
+start_services() {
+    print_header "Starting Services"
+    
+    # PostgreSQL
+    print_status "Starting PostgreSQL service..."
+    case "$DISTRO" in
+        "macos")
+            if command_exists brew; then
+                brew services start postgresql@$PG_VERSION || brew services restart postgresql@$PG_VERSION
+            fi
+            ;;
+        *)
+            sudo systemctl enable $PG_SERVICE 2>/dev/null || true
+            sudo systemctl start $PG_SERVICE || sudo systemctl restart $PG_SERVICE
+            ;;
+    esac
+    
+    # Redis
+    print_status "Starting Redis service..."
+    case "$DISTRO" in
+        "macos")
+            if command_exists brew; then
+                brew services start redis || brew services restart redis
+            fi
+            ;;
+        *)
+            sudo systemctl enable redis-server 2>/dev/null || sudo systemctl enable redis 2>/dev/null || true
+            sudo systemctl start redis-server 2>/dev/null || sudo systemctl start redis 2>/dev/null || true
+            ;;
+    esac
+    
+    # Wait for services to start
+    sleep 3
+    
+    # Verify services
+    if pgrep -x "postgres" >/dev/null; then
+        print_success "PostgreSQL is running"
+    else
+        print_error "Failed to start PostgreSQL"
+        exit 1
+    fi
+    
+    if pgrep -x "redis-server" >/dev/null || pgrep -x "redis" >/dev/null; then
+        print_success "Redis is running"
+    else
+        print_warning "Redis may not be running properly"
+    fi
+}
+
+# Check system requirements (for validation only)
 check_requirements() {
     print_header "Checking System Requirements"
+    
+    local missing_deps=()
     
     # Check Node.js
     if command_exists node; then
@@ -62,36 +344,52 @@ check_requirements() {
         if [ "$NODE_VER" -ge "$NODE_VERSION" ]; then
             print_success "Node.js $(node --version) found"
         else
-            print_error "Node.js version $NODE_VERSION or higher required. Found: $(node --version)"
-            exit 1
+            print_warning "Node.js version $NODE_VERSION or higher required. Found: $(node --version)"
+            missing_deps+=("nodejs")
         fi
     else
-        print_error "Node.js not found. Please install Node.js $NODE_VERSION or higher"
-        exit 1
+        print_warning "Node.js not found"
+        missing_deps+=("nodejs")
     fi
     
     # Check npm
     if command_exists npm; then
         print_success "npm $(npm --version) found"
     else
-        print_error "npm not found. Please install npm"
-        exit 1
+        print_warning "npm not found"
+        missing_deps+=("npm")
     fi
     
     # Check PostgreSQL
     if command_exists psql; then
         print_success "PostgreSQL found"
     else
-        print_error "PostgreSQL not found. Please install PostgreSQL 15 or higher"
-        exit 1
+        print_warning "PostgreSQL not found"
+        missing_deps+=("postgresql")
     fi
     
     # Check Git
     if command_exists git; then
         print_success "Git $(git --version | cut -d' ' -f3) found"
     else
-        print_error "Git not found. Please install Git"
-        exit 1
+        print_warning "Git not found"
+        missing_deps+=("git")
+    fi
+    
+    # If dependencies are missing, offer to install them
+    if [ ${#missing_deps[@]} -gt 0 ]; then
+        print_warning "Missing dependencies: ${missing_deps[*]}"
+        echo ""
+        read -p "Would you like to install missing dependencies automatically? (y/N): " -n 1 -r
+        echo ""
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            install_system_dependencies
+            install_nodejs
+            start_services
+        else
+            print_error "Please install the missing dependencies manually and run this script again"
+            exit 1
+        fi
     fi
 }
 
@@ -368,16 +666,17 @@ EOF
 
 # Main setup function
 main() {
-    print_header "PhishNet Complete Setup"
-    echo "This script will set up the complete PhishNet project including:"
+    print_header "PhishNet Universal Setup"
+    echo "This script will automatically detect your environment and set up PhishNet including:"
+    echo "- Environment detection (Linux/macOS/Windows)"
+    echo "- Automatic dependency installation"
     echo "- Database creation and schema"
     echo "- Sample data import" 
     echo "- Environment configuration"
-    echo "- Dependency installation"
     echo "- Application build"
     echo ""
     
-    read -p "Continue with setup? (y/N): " -n 1 -r
+    read -p "Continue with automatic setup? (y/N): " -n 1 -r
     echo
     if [[ ! $REPLY =~ ^[Yy]$ ]]; then
         print_status "Setup cancelled"
@@ -385,6 +684,7 @@ main() {
     fi
     
     # Run setup steps
+    detect_environment
     check_requirements
     setup_database
     setup_environment
@@ -395,7 +695,13 @@ main() {
     create_scripts
     
     print_header "Setup Complete!"
-    print_success "PhishNet has been set up successfully!"
+    print_success "PhishNet has been set up successfully on $OS_TYPE ($DISTRO)!"
+    echo ""
+    echo "Environment Details:"
+    echo "  - OS: $OS_TYPE"
+    echo "  - Distribution: $DISTRO"
+    echo "  - PostgreSQL: $PG_VERSION"
+    echo "  - Node.js: $(node --version 2>/dev/null || echo 'Not detected')"
     echo ""
     echo "Next steps:"
     echo "1. Update SMTP settings in .env file"

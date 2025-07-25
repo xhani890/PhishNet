@@ -33,15 +33,10 @@ PhishNet is a state-of-the-art phishing simulation and cybersecurity awareness p
 
 ## ⚡ Quick Start
 
-### 🐳 Docker Deployment (Recommended)
-```bash
-git clone https://github.com/gh0st-bit/PhishNet.git
-cd PhishNet/phisnet
-chmod +x scripts/docker-setup.sh
-./scripts/docker-setup.sh
-```
+### 🌐 Universal Setup (Recommended)
+**Automatically detects your environment and installs everything:**
 
-### ⚙️ Manual Setup
+#### Linux/macOS:
 ```bash
 git clone https://github.com/gh0st-bit/PhishNet.git
 cd PhishNet/phisnet
@@ -49,14 +44,27 @@ chmod +x scripts/setup.sh
 ./scripts/setup.sh
 ```
 
-### 🪟 Windows PowerShell
+#### Windows:
 ```powershell
 git clone https://github.com/gh0st-bit/PhishNet.git
 cd PhishNet\phisnet
-.\scripts\docker-setup.ps1
+.\scripts\setup.ps1
 ```
 
-**🎉 That's it!** Access PhishNet at `http://localhost`
+**🎯 Supports:**
+- 🐉 Kali Linux (with auto PostgreSQL fixes)
+- 🐧 Ubuntu/Debian • 🎩 CentOS/RHEL/Rocky
+- 🎁 Fedora • ⚡ Arch/Manjaro
+- 🪟 Windows 10/11 • 🍎 macOS
+
+### 🐳 Docker Deployment
+```bash
+git clone https://github.com/gh0st-bit/PhishNet.git
+cd PhishNet/phisnet
+docker-compose up -d
+```
+
+**🎉 That's it!** Access PhishNet at `http://localhost:5173`
 
 ---
 

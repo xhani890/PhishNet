@@ -1,53 +1,241 @@
 # ===============================================
-# PhishNet Complete Setup Script (Windows)
+# PhishNet Universal Windows Setup Script
 # Version: 1.0
 # Created: July 25, 2025
-# Description: Complete setup script for PhishNet project on Windows
+# Description: Adaptive setup script for Windows environments
 # ===============================================
 
 param(
-    [switch]$SkipDatabaseSetup,
-    [switch]$SkipDependencies,
-    [string]$DatabasePassword = "kali"
+    [switch]$Force,
+    [switch]$NoInteraction
 )
 
-# Configuration
-$ProjectName = "PhishNet"
-$DatabaseName = "phishnet"
-$DatabaseUser = "phishnet_user"
-$NodeVersion = 18
+# Script configuration
+$PROJECT_NAME = "PhishNet"
+$DB_NAME = "phishnet"
+$DB_USER = "phishnet_user"
+$DB_PASSWORD = "kali"
+$NODE_VERSION = "18"
 
-# Colors for output
-function Write-ColorOutput($ForegroundColor) {
-    $fc = $host.UI.RawUI.ForegroundColor
-    $host.UI.RawUI.ForegroundColor = $ForegroundColor
-    if ($args) {
-        Write-Output $args
-    }
-    $host.UI.RawUI.ForegroundColor = $fc
+# Environment detection
+$WindowsVersion = ""
+$HasChocolatey = $false
+$HasScoop = $false
+$HasWinget = $false
+$PgVersion = ""
+$PgService = ""
+
+# Print colored output
+function Write-Status($Message) {
+    Write-Host "[INFO] $Message" -ForegroundColor Blue
 }
 
-function Write-Info($message) {
-    Write-ColorOutput Blue "[INFO] $message"
+function Write-Success($Message) {
+    Write-Host "[SUCCESS] $Message" -ForegroundColor Green
 }
 
-function Write-Success($message) {
-    Write-ColorOutput Green "[SUCCESS] $message"
+function Write-Warning($Message) {
+    Write-Host "[WARNING] $Message" -ForegroundColor Yellow
 }
 
-function Write-Warning($message) {
-    Write-ColorOutput Yellow "[WARNING] $message"
+function Write-Error($Message) {
+    Write-Host "[ERROR] $Message" -ForegroundColor Red
 }
 
-function Write-Error($message) {
-    Write-ColorOutput Red "[ERROR] $message"
-}
-
-function Write-Header($message) {
+function Write-Header($Message) {
     Write-Host ""
     Write-Host "===============================================" -ForegroundColor Cyan
-    Write-Host $message -ForegroundColor Cyan
+    Write-Host $Message -ForegroundColor Cyan
     Write-Host "===============================================" -ForegroundColor Cyan
+}
+
+# Detect Windows environment
+function Detect-Environment {
+    Write-Header "Detecting Windows Environment"
+    
+    # Get Windows version
+    $OSInfo = Get-WmiObject -Class Win32_OperatingSystem
+    $script:WindowsVersion = $OSInfo.Caption
+    Write-Status "Detected: $WindowsVersion"
+    
+    # Check package managers
+    if (Get-Command choco -ErrorAction SilentlyContinue) {
+        $script:HasChocolatey = $true
+        Write-Status "Chocolatey package manager found"
+    }
+    
+    if (Get-Command scoop -ErrorAction SilentlyContinue) {
+        $script:HasScoop = $true
+        Write-Status "Scoop package manager found"
+    }
+    
+    if (Get-Command winget -ErrorAction SilentlyContinue) {
+        $script:HasWinget = $true
+        Write-Status "Winget package manager found"
+    }
+    
+    if (-not ($HasChocolatey -or $HasScoop -or $HasWinget)) {
+        Write-Warning "No package manager detected. Will attempt manual installation guidance."
+        
+        if (-not $NoInteraction) {
+            $Install = Read-Host "Would you like to install Chocolatey for automatic dependency management? (y/N)"
+            if ($Install -eq 'y' -or $Install -eq 'Y') {
+                Install-Chocolatey
+            }
+        }
+    }
+    
+    # Detect PostgreSQL
+    Detect-PostgreSQL
+}
+
+# Install Chocolatey
+function Install-Chocolatey {
+    Write-Status "Installing Chocolatey package manager..."
+    try {
+        Set-ExecutionPolicy Bypass -Scope Process -Force
+        [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
+        Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+        $script:HasChocolatey = $true
+        Write-Success "Chocolatey installed successfully"
+    } catch {
+        Write-Error "Failed to install Chocolatey: $_"
+    }
+}
+
+# Detect PostgreSQL installation
+function Detect-PostgreSQL {
+    Write-Status "Detecting PostgreSQL installation..."
+    
+    # Check if PostgreSQL is installed
+    $PgPaths = @(
+        "C:\Program Files\PostgreSQL\*\bin\psql.exe",
+        "C:\PostgreSQL\*\bin\psql.exe",
+        "${env:ProgramFiles(x86)}\PostgreSQL\*\bin\psql.exe"
+    )
+    
+    $PsqlPath = $null
+    foreach ($Path in $PgPaths) {
+        $Found = Get-ChildItem -Path $Path -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($Found) {
+            $PsqlPath = $Found.FullName
+            $script:PgVersion = ($Found.Directory.Parent.Name -replace '[^\d\.]', '')
+            break
+        }
+    }
+    
+    if ($PsqlPath) {
+        Write-Status "PostgreSQL $PgVersion found at: $PsqlPath"
+        
+        # Check for PostgreSQL service
+        $PgServices = @("postgresql-x64-$PgVersion", "postgresql-$PgVersion", "PostgreSQL")
+        foreach ($Service in $PgServices) {
+            if (Get-Service -Name $Service -ErrorAction SilentlyContinue) {
+                $script:PgService = $Service
+                Write-Status "PostgreSQL service: $PgService"
+                break
+            }
+        }
+    } else {
+        Write-Warning "PostgreSQL not found"
+        $script:PgVersion = "15"  # Default version
+    }
+}
+
+# Install dependencies using available package managers
+function Install-Dependencies {
+    Write-Header "Installing Dependencies"
+    
+    # Node.js installation
+    if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
+        Write-Status "Installing Node.js..."
+        if ($HasChocolatey) {
+            choco install nodejs --version=$NODE_VERSION -y
+        } elseif ($HasWinget) {
+            winget install OpenJS.NodeJS
+        } elseif ($HasScoop) {
+            scoop install nodejs
+        } else {
+            Write-Warning "Please install Node.js manually from https://nodejs.org"
+            Write-Warning "Required version: $NODE_VERSION or higher"
+            if (-not $NoInteraction) {
+                Read-Host "Press Enter after installing Node.js to continue..."
+            }
+        }
+    } else {
+        $NodeVer = (node --version) -replace 'v', '' -split '\.' | Select-Object -First 1
+        if ([int]$NodeVer -ge [int]$NODE_VERSION) {
+            Write-Success "Node.js $(node --version) is already installed"
+        } else {
+            Write-Warning "Node.js version $NODE_VERSION+ required. Found: $(node --version)"
+        }
+    }
+    
+    # PostgreSQL installation
+    if (-not $PsqlPath) {
+        Write-Status "Installing PostgreSQL..."
+        if ($HasChocolatey) {
+            choco install postgresql15 --params "/Password:$DB_PASSWORD" -y
+        } elseif ($HasWinget) {
+            winget install PostgreSQL.PostgreSQL
+            Write-Warning "Please set PostgreSQL password to: $DB_PASSWORD"
+        } elseif ($HasScoop) {
+            scoop bucket add main
+            scoop install postgresql
+            Write-Warning "Please set PostgreSQL password to: $DB_PASSWORD"
+        } else {
+            Write-Warning "Please install PostgreSQL manually from https://www.postgresql.org/download/windows/"
+            Write-Warning "During installation, set password to: $DB_PASSWORD"
+            if (-not $NoInteraction) {
+                Read-Host "Press Enter after installing PostgreSQL to continue..."
+            }
+        }
+        
+        # Re-detect after installation
+        Start-Sleep -Seconds 5
+        Detect-PostgreSQL
+    }
+    
+    # Git installation
+    if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
+        Write-Status "Installing Git..."
+        if ($HasChocolatey) {
+            choco install git -y
+        } elseif ($HasWinget) {
+            winget install Git.Git
+        } elseif ($HasScoop) {
+            scoop install git
+        } else {
+            Write-Warning "Please install Git manually from https://git-scm.com/download/win"
+            if (-not $NoInteraction) {
+                Read-Host "Press Enter after installing Git to continue..."
+            }
+        }
+    } else {
+        $GitVersion = git --version | Select-String '\d+\.\d+\.\d+' | ForEach-Object { $_.Matches.Value }
+        Write-Success "Git $GitVersion found"
+    }
+}
+
+# Start PostgreSQL service
+function Start-PostgreSQLService {
+    Write-Status "Starting PostgreSQL service..."
+    
+    if ($PgService) {
+        try {
+            $Service = Get-Service -Name $PgService
+            if ($Service.Status -ne 'Running') {
+                Start-Service -Name $PgService
+                Write-Success "PostgreSQL service started"
+            } else {
+                Write-Success "PostgreSQL service is already running"
+            }
+        } catch {
+            Write-Error "Failed to start PostgreSQL service: $_"
+        }
+    } else {
+        Write-Warning "PostgreSQL service not found. Please start it manually from Services (services.msc)"
+    }
 }
 
 # Check if command exists
@@ -353,26 +541,29 @@ npm run dev
 
 # Main setup function
 function Start-Setup {
-    Write-Header "PhishNet Complete Setup"
-    Write-Host "This script will set up the complete PhishNet project including:" -ForegroundColor White
+    Write-Header "PhishNet Universal Windows Setup"
+    Write-Host "This script will automatically detect your Windows environment and set up PhishNet including:" -ForegroundColor White
+    Write-Host "- Environment detection (Windows version, package managers)" -ForegroundColor Gray
+    Write-Host "- Automatic dependency installation" -ForegroundColor Gray
     Write-Host "- Database creation and schema" -ForegroundColor Gray
     Write-Host "- Sample data import" -ForegroundColor Gray
     Write-Host "- Environment configuration" -ForegroundColor Gray
-    Write-Host "- Dependency installation" -ForegroundColor Gray
     Write-Host "- Application build" -ForegroundColor Gray
     Write-Host ""
     
-    if (-not $SkipDatabaseSetup -and -not $SkipDependencies) {
-        $continue = Read-Host "Continue with setup? (y/N)"
+    if (-not $NoInteraction) {
+        $continue = Read-Host "Continue with automatic setup? (y/N)"
         if ($continue -ne 'y' -and $continue -ne 'Y') {
-            Write-Info "Setup cancelled"
+            Write-Status "Setup cancelled"
             exit 0
         }
     }
     
     try {
-        # Run setup steps
-        Test-Requirements
+        # Run setup steps with environment detection
+        Detect-Environment
+        Install-Dependencies
+        Start-PostgreSQLService
         Setup-Database
         Setup-Environment
         Install-Dependencies
@@ -382,11 +573,18 @@ function Start-Setup {
         New-Scripts
         
         Write-Header "Setup Complete!"
-        Write-Success "PhishNet has been set up successfully!"
+        Write-Success "PhishNet has been set up successfully on Windows!"
+        Write-Host ""
+        Write-Host "Environment Details:" -ForegroundColor Cyan
+        Write-Host "  - OS: $WindowsVersion" -ForegroundColor White
+        Write-Host "  - PostgreSQL: $PgVersion" -ForegroundColor White
+        if (Get-Command node -ErrorAction SilentlyContinue) {
+            Write-Host "  - Node.js: $(node --version)" -ForegroundColor White
+        }
         Write-Host ""
         Write-Host "Next steps:" -ForegroundColor Cyan
         Write-Host "1. Update SMTP settings in .env file" -ForegroundColor White
-        Write-Host "2. Start development server: .\start-dev.bat or .\start-dev.ps1" -ForegroundColor White
+        Write-Host "2. Start development server: .\start-dev.bat" -ForegroundColor White
         Write-Host "3. Open browser to: http://localhost:5173" -ForegroundColor White
         Write-Host ""
         Write-Host "Default admin accounts:" -ForegroundColor Cyan
@@ -403,7 +601,7 @@ function Start-Setup {
         
     } catch {
         Write-Error "Setup failed: $($_.Exception.Message)"
-        Write-Info "Please check the error above and try again"
+        Write-Status "Please check the error above and try again"
         exit 1
     }
 }
