@@ -183,16 +183,40 @@ setup_database() {
 setup_redis() {
     log "Setting up Redis..."
     
-    # Start Redis service
+    # Start Redis service with fallback detection
     if is_windows; then
         net start Redis 2>/dev/null || true
     elif command -v systemctl >/dev/null 2>&1; then
-        sudo systemctl start redis
-        sudo systemctl enable redis
+        # Try different Redis service names
+        if systemctl list-unit-files | grep -q "redis-server.service"; then
+            log "Starting redis-server service..."
+            sudo systemctl start redis-server 2>/dev/null || true
+            sudo systemctl enable redis-server 2>/dev/null || true
+        elif systemctl list-unit-files | grep -q "redis.service"; then
+            log "Starting redis service..."
+            sudo systemctl start redis 2>/dev/null || true
+            sudo systemctl enable redis 2>/dev/null || true
+        else
+            log "No Redis systemd service found, trying manual start..."
+            # Try to start Redis manually for Kali/other systems
+            sudo redis-server --daemonize yes 2>/dev/null || true
+        fi
     elif command -v service >/dev/null 2>&1; then
-        sudo service redis-server start
+        sudo service redis-server start 2>/dev/null || true
     elif is_wsl; then
-        sudo service redis-server start
+        sudo service redis-server start 2>/dev/null || true
+    else
+        # Fallback: try to start Redis manually
+        log "Starting Redis manually..."
+        sudo redis-server --daemonize yes 2>/dev/null || true
+    fi
+    
+    # Verify Redis is running
+    if redis-cli ping >/dev/null 2>&1; then
+        log "✅ Redis is running successfully"
+    else
+        warn "⚠️  Redis may not be running, but continuing deployment..."
+        log "💡 You can start Redis manually later with: sudo redis-server --daemonize yes"
     fi
     
     log "Redis setup completed"
