@@ -8,7 +8,7 @@
 param(
     [switch]$SkipDatabaseSetup,
     [switch]$SkipDependencies,
-    [string]$DatabasePassword = "your_secure_password_here"
+    [string]$DatabasePassword = "kali"
 )
 
 # Configuration

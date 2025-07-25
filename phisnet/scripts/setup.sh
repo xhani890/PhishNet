@@ -20,7 +20,7 @@ NC='\033[0m' # No Color
 PROJECT_NAME="PhishNet"
 DB_NAME="phishnet"
 DB_USER="phishnet_user"
-DB_PASSWORD="your_secure_password_here"
+DB_PASSWORD="kali"
 NODE_VERSION="18"
 
 # Print colored output
@@ -99,52 +99,115 @@ check_requirements() {
 setup_database() {
     print_header "Setting up Database"
     
+    print_status "Database credentials being used:"
+    print_status "  Host: localhost"
+    print_status "  Database: $DB_NAME"
+    print_status "  Username: $DB_USER"
+    print_status "  Password: $DB_PASSWORD"
+    
     print_status "Creating database and user..."
     
-    # Create database setup SQL
+    # Fix PostgreSQL collation version warnings (common in Kali Linux)
+    print_status "Fixing PostgreSQL collation warnings..."
+    sudo -u postgres psql -c "ALTER DATABASE template1 REFRESH COLLATION VERSION;" 2>/dev/null || true
+    sudo -u postgres psql -c "ALTER DATABASE postgres REFRESH COLLATION VERSION;" 2>/dev/null || true
+    
+    # Create database setup SQL with proper error handling
     cat > /tmp/setup_db.sql << EOF
--- Create database
-CREATE DATABASE $DB_NAME;
+-- Drop database and user if they exist (for clean reinstall)
+DROP DATABASE IF EXISTS $DB_NAME;
+DROP USER IF EXISTS $DB_USER;
 
--- Create user
+-- Create user with password
 CREATE USER $DB_USER WITH PASSWORD '$DB_PASSWORD';
+
+-- Create database
+CREATE DATABASE $DB_NAME OWNER $DB_USER;
 
 -- Grant privileges
 GRANT ALL PRIVILEGES ON DATABASE $DB_NAME TO $DB_USER;
-
--- Grant schema privileges
-\\c $DB_NAME;
-GRANT ALL ON SCHEMA public TO $DB_USER;
-GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO $DB_USER;
-GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO $DB_USER;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO $DB_USER;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO $DB_USER;
+ALTER USER $DB_USER CREATEDB;
 EOF
 
     # Execute database setup
     if sudo -u postgres psql < /tmp/setup_db.sql; then
-        print_success "Database created successfully"
+        print_success "Database and user created successfully"
     else
-        print_warning "Database might already exist, continuing..."
+        print_error "Failed to create database and user"
+        rm -f /tmp/setup_db.sql
+        exit 1
     fi
     
     # Clean up temp file
     rm -f /tmp/setup_db.sql
     
-    print_status "Running database schema migration..."
-    if psql -h localhost -U $DB_USER -d $DB_NAME -f migrations/00_phishnet_schema.sql; then
-        print_success "Schema created successfully"
-    else
-        print_error "Failed to create database schema"
-        exit 1
+    # Configure PostgreSQL authentication if needed
+    print_status "Configuring PostgreSQL authentication..."
+    
+    PG_VERSION=$(sudo -u postgres psql -t -c "SELECT version();" | grep -oE '[0-9]+\.[0-9]+' | head -1 || echo "15")
+    PG_HBA_FILE="/etc/postgresql/$PG_VERSION/main/pg_hba.conf"
+    
+    if [ -f "$PG_HBA_FILE" ]; then
+        # Backup original file
+        sudo cp "$PG_HBA_FILE" "$PG_HBA_FILE.backup" 2>/dev/null || true
+        
+        # Ensure local connections work with password authentication
+        if ! sudo grep -q "local.*all.*all.*md5" "$PG_HBA_FILE"; then
+            print_status "Updating PostgreSQL authentication configuration..."
+            sudo sed -i 's/local   all             all                                     peer/local   all             all                                     md5/' "$PG_HBA_FILE" 2>/dev/null || true
+            
+            # Restart PostgreSQL to apply changes
+            print_status "Restarting PostgreSQL service..."
+            sudo systemctl restart postgresql 2>/dev/null || sudo service postgresql restart 2>/dev/null || true
+            sleep 3
+        fi
     fi
     
-    print_status "Importing sample data..."
-    if psql -h localhost -U $DB_USER -d $DB_NAME -f migrations/01_sample_data.sql; then
-        print_success "Sample data imported successfully"
+    print_status "Testing database connection..."
+    
+    # Test connection with password
+    export PGPASSWORD="$DB_PASSWORD"
+    if psql -h localhost -U "$DB_USER" -d "$DB_NAME" -c "SELECT 1;" >/dev/null 2>&1; then
+        print_success "Database connection successful"
+        
+        print_status "Running database schema migration..."
+        if psql -h localhost -U $DB_USER -d $DB_NAME -f migrations/00_phishnet_schema.sql; then
+            print_success "Schema created successfully"
+        else
+            print_error "Failed to create database schema"
+            unset PGPASSWORD
+            exit 1
+        fi
+        
+        print_status "Importing sample data..."
+        if psql -h localhost -U $DB_USER -d $DB_NAME -f migrations/01_sample_data.sql; then
+            print_success "Sample data imported successfully"
+        else
+            print_warning "Failed to import sample data (continuing anyway)"
+        fi
     else
-        print_warning "Failed to import sample data (continuing anyway)"
+        print_warning "Password authentication failed, trying with sudo postgres user..."
+        
+        # Try with sudo -u postgres for peer authentication
+        if sudo -u postgres psql -d "$DB_NAME" -f migrations/00_phishnet_schema.sql; then
+            print_success "Schema created successfully (using postgres user)"
+            
+            if sudo -u postgres psql -d "$DB_NAME" -f migrations/01_sample_data.sql; then
+                print_success "Sample data imported successfully (using postgres user)"
+            else
+                print_warning "Failed to import sample data (continuing anyway)"
+            fi
+        else
+            print_error "Failed to create database schema"
+            unset PGPASSWORD
+            exit 1
+        fi
     fi
+    
+    # Unset password variable for security
+    unset PGPASSWORD
+    
+    print_success "Database setup completed successfully"
 }
 
 # Setup environment files

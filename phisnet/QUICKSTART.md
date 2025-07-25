@@ -9,7 +9,27 @@
 
 ## 🎯 Choose Your Setup Method
 
-### 🐳 Option 1: Docker (Recommended)
+### � Kali Linux (Special Instructions)
+
+If you're using Kali Linux, PostgreSQL might need special configuration:
+
+```bash
+# 1. Clone the repository  
+git clone https://github.com/gh0st-bit/PhishNet.git
+cd PhishNet/phisnet
+
+# 2. Fix PostgreSQL issues first (Kali Linux specific)
+chmod +x scripts/fix-postgresql-kali.sh
+./scripts/fix-postgresql-kali.sh
+
+# 3. Run main setup
+chmod +x scripts/setup.sh
+./scripts/setup.sh
+```
+
+**🔐 Database Credentials:** `phishnet_user` / `kali` (password will be displayed during setup)
+
+### �🐳 Option 1: Docker (Recommended)
 **Best for:** Production, Testing, Easy Setup
 
 ```bash
@@ -249,6 +269,31 @@ After setup, verify these components are working:
 ---
 
 ## 🚨 Troubleshooting Quick Fixes
+
+### Kali Linux PostgreSQL Issues
+
+If you see errors like:
+- `collation version mismatch`
+- `password authentication failed`
+- `database "phishnet" does not exist`
+
+**🔧 Quick Fix:**
+```bash
+# Run the PostgreSQL fix script first
+chmod +x scripts/fix-postgresql-kali.sh
+./scripts/fix-postgresql-kali.sh
+
+# Then run main setup
+./scripts/setup.sh
+```
+
+### Wrong Directory Error
+```bash
+# If you see: cd: no such file or directory: PhishNet/phisnet
+# You're already in the right directory, just run:
+chmod +x scripts/setup.sh
+./scripts/setup.sh
+```
 
 ### Application Won't Load
 ```bash
