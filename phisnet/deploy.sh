@@ -163,6 +163,22 @@ run_kali_fixes() {
     
     # Fix Docker socket permissions temporarily
     sudo chmod 666 /var/run/docker.sock 2>/dev/null || true
+    
+    # Start Docker service if not running
+    if ! systemctl is-active --quiet docker; then
+        sudo systemctl start docker
+        sleep 2
+    fi
+    
+    # Test Docker access immediately
+    if docker ps >/dev/null 2>&1; then
+        success "Docker permissions working immediately"
+    else
+        warning "Docker permissions need group refresh - will work after 'newgrp docker'"
+        # Try to fix socket permissions more aggressively
+        sudo chmod 777 /var/run/docker.sock 2>/dev/null || true
+    fi
+    
     success "Docker socket permissions fixed"
     
     # 3. Ensure Docker daemon is running
@@ -178,8 +194,22 @@ run_kali_fixes() {
         success "Dockerfile fixed (redis-tools → redis)"
     fi
     
+    # Fix Dockerfile npm ci issue
+    if [[ -f "Dockerfile" ]] && grep -q "npm ci --only=production" Dockerfile; then
+        info "🔧 Fixing Dockerfile npm ci issue..."
+        sed -i 's/npm ci --only=production --ignore-scripts/npm install --production --ignore-scripts || npm install --ignore-scripts/g' Dockerfile
+        success "Dockerfile npm command fixed"
+    fi
+    
+    # 5. Fix docker-compose.yml version warning
+    if [[ -f "docker-compose.yml" ]] && grep -q "version:" docker-compose.yml; then
+        info "🔧 Step 5: Fixing docker-compose.yml version warning..."
+        sed -i '/^version:/d' docker-compose.yml
+        success "docker-compose.yml version attribute removed"
+    fi
+    
     # 5. Test fixes
-    info "🔍 Step 5: Testing fixes..."
+    info "🔍 Step 6: Testing fixes..."
     
     # Test Docker
     if docker --version >/dev/null 2>&1; then
@@ -208,7 +238,24 @@ run_kali_fixes() {
         warning "Docker not accessible"
     fi
     
+    # Test Docker permissions immediately and suggest next steps
+    if docker ps >/dev/null 2>&1; then
+        success "Docker permissions working - you can use: docker compose up -d"
+    elif sudo docker ps >/dev/null 2>&1; then
+        warning "Docker works with sudo only"
+        info "You can use: sudo docker compose up -d"
+        info "Or run: newgrp docker (then use without sudo)"
+    else
+        warning "Docker not accessible - check installation"
+    fi
+    
     success "Kali-specific fixes completed"
+    
+    # Provide immediate usage instructions
+    info "🎯 Ready to start containers:"
+    info "   Option 1: sudo docker compose up -d"
+    info "   Option 2: newgrp docker && docker compose up -d"
+    info "   Option 3: Log out and back in, then: docker compose up -d"
 }
 
 # Run auto chmod at start
@@ -686,6 +733,18 @@ fi
 
 # Install npm dependencies
 info "🚀 Setting up PhishNet application..."
+
+# Generate package-lock.json if missing (fixes Docker build)
+if [[ ! -f "package-lock.json" ]]; then
+    info "Generating package-lock.json for Docker compatibility..."
+    npm install --package-lock-only 2>/dev/null || npm install --dry-run 2>/dev/null || true
+    if [[ -f "package-lock.json" ]]; then
+        success "package-lock.json generated"
+    else
+        warning "Could not generate package-lock.json - Docker build may use npm install fallback"
+    fi
+fi
+
 npm install
 
 # Database schema

@@ -23,8 +23,8 @@ COPY package*.json ./
 COPY client/package*.json ./client/
 COPY server/package*.json ./server/
 
-# Install dependencies
-RUN npm ci --only=production --ignore-scripts
+# Install dependencies (use npm install instead of npm ci for flexibility)
+RUN npm install --production --ignore-scripts || npm install --ignore-scripts
 
 # Copy source code
 COPY . .
