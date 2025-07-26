@@ -54,6 +54,144 @@ if [[ ! -f "package.json" ]]; then
     exit 1
 fi
 
+# Auto chmod function - makes scripts executable
+auto_chmod() {
+    info "🔧 Setting script permissions..."
+    
+    # List of scripts that should be executable
+    local scripts=(
+        "deploy.sh"
+        "start.sh" 
+        "kali-docker-fix.sh"
+        "kali-redis-fix.sh"
+        "reset-db.sh"
+        "check-deps.sh"
+        "start-dev.sh"
+        "start-prod.sh"
+        "start-kali.sh"
+        "fix-final-errors.sh"
+        "create-package.sh"
+    )
+    
+    for script in "${scripts[@]}"; do
+        if [[ -f "$script" ]]; then
+            chmod +x "$script" 2>/dev/null || true
+            if [[ -x "$script" ]]; then
+                success "Made $script executable"
+            else
+                warning "Failed to make $script executable"
+            fi
+        fi
+    done
+    
+    # Also make any .sh files executable
+    find . -maxdepth 1 -name "*.sh" -type f -exec chmod +x {} \; 2>/dev/null || true
+    
+    # Fix directory permissions if needed
+    if [[ ! -w "." ]]; then
+        warning "Directory not writable, attempting to fix permissions..."
+        chmod 755 . 2>/dev/null || true
+    fi
+    
+    # Make node_modules/.bin executable if it exists
+    if [[ -d "node_modules/.bin" ]]; then
+        chmod +x node_modules/.bin/* 2>/dev/null || true
+    fi
+    
+    success "Script permissions updated"
+}
+
+# Enhanced permission diagnostic
+check_permissions() {
+    info "🔍 Checking file permissions..."
+    
+    # Check current directory permissions
+    if [[ ! -w "." ]]; then
+        warning "Current directory is not writable"
+        return 1
+    fi
+    
+    # Check if we can create files
+    if ! touch .permission_test 2>/dev/null; then
+        warning "Cannot create files in current directory"
+        return 1
+    else
+        rm .permission_test 2>/dev/null || true
+        success "Directory permissions OK"
+    fi
+    
+    # Check script executability
+    if [[ -f "deploy.sh" && ! -x "deploy.sh" ]]; then
+        warning "deploy.sh is not executable"
+        chmod +x deploy.sh 2>/dev/null || true
+    fi
+    
+    return 0
+}
+
+# Run auto chmod at start
+check_permissions
+auto_chmod
+
+# Create missing essential scripts if they don't exist
+create_missing_scripts() {
+    info "📝 Checking for missing essential scripts..."
+    
+    # Create start.sh if missing
+    if [[ ! -f "start.sh" ]]; then
+        info "Creating start.sh script..."
+        cat > start.sh << 'EOF'
+#!/bin/bash
+# 🎣 PhishNet Universal Startup Script
+
+echo "🚀 Starting PhishNet..."
+
+# Start services
+sudo systemctl start postgresql redis-server 2>/dev/null || sudo systemctl start postgresql redis 2>/dev/null || true
+
+# Check .env file
+if [[ ! -f ".env" ]]; then
+    echo "❌ No .env file found. Run ./deploy.sh first"
+    exit 1
+fi
+
+# Start application
+export NODE_ENV=development
+npx tsx server/index.ts
+EOF
+        chmod +x start.sh
+        success "Created start.sh"
+    fi
+    
+    # Create reset-db.sh if missing
+    if [[ ! -f "reset-db.sh" ]]; then
+        info "Creating reset-db.sh script..."
+        cat > reset-db.sh << 'EOF'
+#!/bin/bash
+# 🗄️ PhishNet Database Reset Script
+
+echo "🗄️ Resetting PhishNet database..."
+
+# Drop and recreate database
+sudo -u postgres psql -c "DROP DATABASE IF EXISTS phishnet_db;" 2>/dev/null || true
+sudo -u postgres psql -c "CREATE DATABASE phishnet_db OWNER phishnet_user;" 2>/dev/null || true
+
+# Push schema and import data
+npm run db:push
+npm run import-data
+
+echo "✅ Database reset complete"
+EOF
+        chmod +x reset-db.sh
+        success "Created reset-db.sh"
+    fi
+    
+    success "Essential scripts verified"
+}
+
+# Run script creation
+create_missing_scripts
+
 # Detect OS and distribution
 detect_os() {
     if [[ "$OSTYPE" == "darwin"* ]]; then
@@ -104,7 +242,7 @@ start_docker_daemon() {
     info "Starting Docker daemon..."
     
     case "$DISTRO" in
-        ubuntu|debian)
+        ubuntu|debian|kali)
             sudo systemctl start docker || sudo service docker start
             sudo systemctl enable docker
             ;;
@@ -135,7 +273,7 @@ install_docker() {
     info "🐳 Installing Docker..."
     
     case "$DISTRO" in
-        ubuntu|debian)
+        ubuntu|debian|kali)
             # Update package index
             sudo apt-get update
             
@@ -143,14 +281,25 @@ install_docker() {
             sudo apt-get install -y apt-transport-https ca-certificates curl gnupg lsb-release
             
             # Add Docker's official GPG key
-            curl -fsSL https://download.docker.com/linux/$DISTRO/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
-            
-            # Set up repository
-            echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/$DISTRO $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+            if [[ "$DISTRO" == "kali" ]]; then
+                # Kali-specific Docker installation
+                curl -fsSL https://download.docker.com/linux/debian/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+                echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/debian bullseye stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+            else
+                curl -fsSL https://download.docker.com/linux/$DISTRO/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+                echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/$DISTRO $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+            fi
             
             # Install Docker Engine
             sudo apt-get update
             sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+            
+            # Fix docker-compose for Kali
+            if [[ "$DISTRO" == "kali" ]]; then
+                sudo apt-get remove -y docker-compose 2>/dev/null || true
+                sudo apt-get install -y python3-pip
+                sudo pip3 install docker-compose
+            fi
             ;;
             
         centos|rhel)
@@ -202,9 +351,20 @@ install_dependencies() {
     info "📦 Installing dependencies..."
     
     case "$DISTRO" in
-        ubuntu|debian)
+        ubuntu|debian|kali)
             sudo apt-get update
             sudo apt-get install -y curl wget git build-essential postgresql postgresql-contrib redis-server nodejs npm
+            
+            # Kali-specific fixes
+            if [[ "$DISTRO" == "kali" ]]; then
+                # Fix docker-compose segfault issue
+                sudo apt-get remove -y docker-compose 2>/dev/null || true
+                sudo apt-get install -y python3-pip
+                sudo pip3 install docker-compose
+                
+                # Install additional Kali dependencies
+                sudo apt-get install -y python3-dev libpq-dev
+            fi
             
             # Install Node.js 18+ if needed
             if ! node --version | grep -q "v1[89]\|v[2-9][0-9]"; then
@@ -253,8 +413,39 @@ install_dependencies() {
     success "Dependencies installed"
 }
 
+# Kali-specific permission fixes
+kali_permission_fixes() {
+    if [[ "$DISTRO" == "kali" ]]; then
+        info "🐉 Applying Kali-specific permission fixes..."
+        
+        # Fix common Kali permission issues
+        sudo chown -R $USER:$USER . 2>/dev/null || true
+        
+        # Fix npm global permissions
+        if [[ -d "/usr/lib/node_modules" ]]; then
+            sudo chown -R $USER:$USER /usr/lib/node_modules 2>/dev/null || true
+        fi
+        
+        # Fix .npm cache permissions
+        if [[ -d "$HOME/.npm" ]]; then
+            sudo chown -R $USER:$USER $HOME/.npm 2>/dev/null || true
+        fi
+        
+        # Make sure current user owns the project directory
+        if [[ "$PWD" != "$HOME"* ]]; then
+            warning "Not in home directory, fixing ownership..."
+            sudo chown -R $USER:$USER "$PWD" 2>/dev/null || true
+        fi
+        
+        success "Kali permission fixes applied"
+    fi
+}
+
 # Main execution
 detect_os
+
+# Apply Kali fixes if needed
+kali_permission_fixes
 
 # Check and install Docker if needed
 if ! check_docker; then
@@ -310,6 +501,14 @@ sudo -u postgres psql -c "CREATE USER phishnet_user WITH PASSWORD 'phishnet_pass
 sudo -u postgres psql -c "CREATE DATABASE phishnet_db OWNER phishnet_user;" 2>/dev/null || true
 sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE phishnet_db TO phishnet_user;" 2>/dev/null || true
 
+# Verify database connection
+info "🔍 Verifying database connection..."
+if PGPASSWORD=phishnet_password psql -h localhost -U phishnet_user -d phishnet_db -c "SELECT 1;" >/dev/null 2>&1; then
+    success "Database connection verified"
+else
+    warning "Database connection failed, but continuing..."
+fi
+
 success "Database setup complete"
 
 # Environment setup
@@ -324,6 +523,16 @@ SESSION_SECRET=dev-secret-key-change-in-production
 APP_URL=http://localhost:3000
 EOF
     success "Environment file created"
+fi
+
+# Verify .env file
+if [[ -f ".env" ]]; then
+    info "📋 Environment file contents:"
+    cat .env | sed 's/PASSWORD=.*/PASSWORD=***/' # Hide password in output
+    success "Environment verified"
+else
+    error "Failed to create .env file"
+    exit 1
 fi
 
 # Install npm dependencies
