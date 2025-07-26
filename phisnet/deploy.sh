@@ -690,16 +690,15 @@ case "$DISTRO" in
         ;;
 esac
 
-# Database setup
-sudo -u postgres psql -c "DROP DATABASE IF EXISTS phishnet_db;" 2>/dev/null || true
-sudo -u postgres psql -c "DROP USER IF EXISTS phishnet_user;" 2>/dev/null || true
-sudo -u postgres psql -c "CREATE USER phishnet_user WITH PASSWORD 'phishnet_password';" 2>/dev/null || true
-sudo -u postgres psql -c "CREATE DATABASE phishnet_db OWNER phishnet_user;" 2>/dev/null || true
-sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE phishnet_db TO phishnet_user;" 2>/dev/null || true
+# Database setup - Use consistent naming with default postgres user
+sudo -u postgres psql -c "DROP DATABASE IF EXISTS phishnet;" 2>/dev/null || true
+# Create database with default postgres user (no separate phishnet_user)
+sudo -u postgres psql -c "CREATE DATABASE phishnet;" 2>/dev/null || true
+sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE phishnet TO postgres;" 2>/dev/null || true
 
-# Verify database connection
+# Verify database connection with postgres user
 info "🔍 Verifying database connection..."
-if PGPASSWORD=phishnet_password psql -h localhost -U phishnet_user -d phishnet_db -c "SELECT 1;" >/dev/null 2>&1; then
+if sudo -u postgres psql -d phishnet -c "SELECT 1;" >/dev/null 2>&1; then
     success "Database connection verified"
 else
     warning "Database connection failed, but continuing..."
@@ -711,7 +710,7 @@ success "Database setup complete"
 info "📝 Setting up environment..."
 if [[ ! -f ".env" ]]; then
     cat > .env << EOF
-DATABASE_URL=postgresql://phishnet_user:phishnet_password@localhost:5432/phishnet_db
+DATABASE_URL=postgresql://postgres@localhost:5432/phishnet
 REDIS_URL=redis://localhost:6379
 PORT=3000
 NODE_ENV=development

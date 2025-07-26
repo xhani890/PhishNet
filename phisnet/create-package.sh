@@ -46,26 +46,49 @@ if command -v pg_dump >/dev/null 2>&1; then
         DB_URL=$(grep "DATABASE_URL" .env | cut -d'=' -f2-)
         if [[ -n "$DB_URL" ]]; then
             # Extract components from DATABASE_URL
-            DB_USER=$(echo "$DB_URL" | sed 's/.*:\/\/\([^:]*\):.*/\1/')
-            DB_PASS=$(echo "$DB_URL" | sed 's/.*:\/\/[^:]*:\([^@]*\)@.*/\1/')
-            DB_HOST=$(echo "$DB_URL" | sed 's/.*@\([^:]*\):.*/\1/')
+            if [[ "$DB_URL" == *"@"* ]]; then
+                # URL with password
+                DB_USER=$(echo "$DB_URL" | sed 's/.*:\/\/\([^:]*\):.*/\1/')
+                DB_PASS=$(echo "$DB_URL" | sed 's/.*:\/\/[^:]*:\([^@]*\)@.*/\1/')
+                DB_HOST=$(echo "$DB_URL" | sed 's/.*@\([^:]*\):.*/\1/')
+            else
+                # URL without password (postgres user)
+                DB_USER=$(echo "$DB_URL" | sed 's/.*:\/\/\([^@]*\)@.*/\1/')
+                DB_PASS=""
+                DB_HOST=$(echo "$DB_URL" | sed 's/.*@\([^:]*\):.*/\1/')
+            fi
             DB_PORT=$(echo "$DB_URL" | sed 's/.*:\([0-9]*\)\/.*/\1/')
             DB_NAME=$(echo "$DB_URL" | sed 's/.*\/\([^?]*\).*/\1/')
             
-            info "Database: $DB_NAME on $DB_HOST:$DB_PORT"
+            info "Database: $DB_NAME on $DB_HOST:$DB_PORT (user: $DB_USER)"
             
             # Export database with data
-            PGPASSWORD="$DB_PASS" pg_dump -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" \
-                --verbose --clean --if-exists --create --inserts \
-                > "$EXPORT_DIR/database-full-backup.sql" 2>/dev/null || {
-                warning "Full backup failed, trying data-only..."
+            if [[ -n "$DB_PASS" ]]; then
                 PGPASSWORD="$DB_PASS" pg_dump -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" \
-                    --data-only --inserts \
-                    > "$EXPORT_DIR/database-data-only.sql" 2>/dev/null || {
-                    error "Database export failed - creating package without database"
-                    warning "Your friend will get a fresh installation"
+                    --verbose --clean --if-exists --create --inserts \
+                    > "$EXPORT_DIR/database-full-backup.sql" 2>/dev/null || {
+                    warning "Full backup failed, trying data-only..."
+                    PGPASSWORD="$DB_PASS" pg_dump -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" \
+                        --data-only --inserts \
+                        > "$EXPORT_DIR/database-data-only.sql" 2>/dev/null || {
+                        error "Database export failed - creating package without database"
+                        warning "Your friend will get a fresh installation"
+                    }
                 }
-            }
+            else
+                # No password - use postgres user
+                pg_dump -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" \
+                    --verbose --clean --if-exists --create --inserts \
+                    > "$EXPORT_DIR/database-full-backup.sql" 2>/dev/null || {
+                    warning "Full backup failed, trying data-only..."
+                    pg_dump -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" \
+                        --data-only --inserts \
+                        > "$EXPORT_DIR/database-data-only.sql" 2>/dev/null || {
+                        error "Database export failed - creating package without database"
+                        warning "Your friend will get a fresh installation"
+                    }
+                }
+            fi
             success "Database exported with your data"
         else
             warning "Could not parse DATABASE_URL - creating package without database"
@@ -149,14 +172,13 @@ cd phishnet/
 
 ### If you have PostgreSQL installed:
 ```bash
-# Create user and database
-sudo -u postgres createuser -P phishnet_user
-sudo -u postgres createdb -O phishnet_user phishnet_db
+# Create database (using existing postgres user)
+sudo -u postgres createdb phishnet
 
 # Restore database
-psql -U phishnet_user -d phishnet_db -f database-full-backup.sql
+psql -U postgres -d phishnet -f database-full-backup.sql
 # OR if full backup doesn't work:
-psql -U phishnet_user -d phishnet_db -f database-data-only.sql
+psql -U postgres -d phishnet -f database-data-only.sql
 ```
 
 ## 🌐 Access Application
@@ -174,9 +196,8 @@ psql -U phishnet_user -d phishnet_db -f database-data-only.sql
 - Change default passwords after setup
 - Update environment variables for production
 - The database contains the original creator's data
-EOF
 
-echo "✅ Quick setup completed!"
+✅ Quick setup completed!
 EOF
 
 # Step 5: Create automated setup script
@@ -222,7 +243,7 @@ sleep 5
 echo "🗄️ Restoring database from backup..."
 if command -v psql >/dev/null 2>&1; then
     # Try to restore database
-    PGPASSWORD=phishnet_password psql -h localhost -U phishnet_user -d phishnet_db -f "$DB_BACKUP_FILE" 2>/dev/null || {
+    psql -h localhost -U postgres -d phishnet -f "$DB_BACKUP_FILE" 2>/dev/null || {
         echo "⚠️ Database restore had issues, but PhishNet should still work"
         echo "💡 You can try manual restore with the provided SQL files"
     }
