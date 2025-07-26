@@ -129,6 +129,88 @@ check_permissions() {
     return 0
 }
 
+# Comprehensive Kali Linux fixes
+run_kali_fixes() {
+    info "🚨 Running comprehensive Kali Linux fixes..."
+    
+    # 1. Fix Docker Compose segfault
+    info "🔧 Step 1: Fixing Docker Compose segfault..."
+    sudo apt-get remove -y docker-compose 2>/dev/null || true
+    
+    # Install pipx for isolated packages
+    if ! command -v pipx >/dev/null 2>&1; then
+        info "Installing pipx for isolated Python packages..."
+        sudo apt-get install -y pipx python3-venv
+    fi
+    
+    # Install docker-compose via pipx
+    if pipx install docker-compose 2>/dev/null; then
+        success "Docker Compose installed via pipx"
+        export PATH="$HOME/.local/bin:$PATH"
+        echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc 2>/dev/null || true
+        echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc 2>/dev/null || true
+    else
+        warning "pipx failed, using pip with --break-system-packages..."
+        sudo pip3 install docker-compose --break-system-packages 2>/dev/null || true
+    fi
+    
+    # 2. Fix Docker permissions
+    info "🔧 Step 2: Fixing Docker permissions..."
+    if ! groups | grep -q docker; then
+        sudo usermod -aG docker "$USER"
+        success "Added to docker group"
+    fi
+    
+    # Fix Docker socket permissions temporarily
+    sudo chmod 666 /var/run/docker.sock 2>/dev/null || true
+    success "Docker socket permissions fixed"
+    
+    # 3. Ensure Docker daemon is running
+    info "🔧 Step 3: Starting Docker daemon..."
+    sudo systemctl start docker 2>/dev/null || true
+    sudo systemctl enable docker 2>/dev/null || true
+    success "Docker daemon started"
+    
+    # 4. Fix Dockerfile Alpine package issue
+    if [[ -f "Dockerfile" ]] && grep -q "redis-tools" Dockerfile; then
+        info "🔧 Step 4: Fixing Dockerfile Alpine package issue..."
+        sed -i 's/redis-tools/redis/g' Dockerfile
+        success "Dockerfile fixed (redis-tools → redis)"
+    fi
+    
+    # 5. Test fixes
+    info "🔍 Step 5: Testing fixes..."
+    
+    # Test Docker
+    if docker --version >/dev/null 2>&1; then
+        success "Docker: $(docker --version | cut -d' ' -f3 | cut -d',' -f1)"
+    else
+        warning "Docker not working"
+    fi
+    
+    # Test Docker Compose
+    if command -v "$HOME/.local/bin/docker-compose" >/dev/null 2>&1; then
+        success "Docker Compose (pipx): Available"
+    elif docker compose version >/dev/null 2>&1; then
+        success "Docker Compose (native): Available"
+    elif docker-compose --version >/dev/null 2>&1; then
+        success "Docker Compose (system): Available"
+    else
+        warning "Docker Compose not working"
+    fi
+    
+    # Test Docker permissions
+    if docker ps >/dev/null 2>&1; then
+        success "Docker permissions working"
+    elif sudo docker ps >/dev/null 2>&1; then
+        warning "Docker works with sudo only - run 'newgrp docker' after deployment"
+    else
+        warning "Docker not accessible"
+    fi
+    
+    success "Kali-specific fixes completed"
+}
+
 # Run auto chmod at start
 check_permissions
 auto_chmod
@@ -161,6 +243,29 @@ npx tsx server/index.ts
 EOF
         chmod +x start.sh
         success "Created start.sh"
+    fi
+    
+    # Create kali-quick-fix.sh if missing
+    if [[ ! -f "kali-quick-fix.sh" ]]; then
+        info "Creating kali-quick-fix.sh script..."
+        cat > kali-quick-fix.sh << 'EOF'
+#!/bin/bash
+# 🚨 Kali Linux Quick Fix Script
+echo "🚨 Running Kali Linux comprehensive fixes..."
+echo "This script fixes Docker Compose segfault, permissions, and package issues."
+echo ""
+
+# Re-run the deployment with built-in Kali fixes
+if [[ -f "deploy.sh" ]]; then
+    echo "🔄 Re-running deployment with integrated Kali fixes..."
+    ./deploy.sh --skip-deps
+else
+    echo "❌ deploy.sh not found. Please run from PhishNet directory."
+    exit 1
+fi
+EOF
+        chmod +x kali-quick-fix.sh
+        success "Created kali-quick-fix.sh"
     fi
     
     # Create reset-db.sh if missing
@@ -297,8 +402,16 @@ install_docker() {
             # Fix docker-compose for Kali
             if [[ "$DISTRO" == "kali" ]]; then
                 sudo apt-get remove -y docker-compose 2>/dev/null || true
-                sudo apt-get install -y python3-pip
-                sudo pip3 install docker-compose
+                
+                # Install via pipx (isolated environment)
+                sudo apt-get install -y pipx python3-venv
+                pipx install docker-compose || {
+                    # Fallback: use --break-system-packages
+                    sudo pip3 install docker-compose --break-system-packages
+                }
+                
+                # Ensure pipx bin is in PATH
+                export PATH="$HOME/.local/bin:$PATH"
             fi
             ;;
             
@@ -357,13 +470,25 @@ install_dependencies() {
             
             # Kali-specific fixes
             if [[ "$DISTRO" == "kali" ]]; then
-                # Fix docker-compose segfault issue
+                # Fix docker-compose segfault issue - use pipx instead of pip
                 sudo apt-get remove -y docker-compose 2>/dev/null || true
-                sudo apt-get install -y python3-pip
-                sudo pip3 install docker-compose
+                
+                # Install pipx for isolated Python packages
+                sudo apt-get install -y pipx python3-venv
+                
+                # Install docker-compose via pipx (isolated environment)
+                pipx install docker-compose || {
+                    # Fallback: use --break-system-packages if pipx fails
+                    sudo pip3 install docker-compose --break-system-packages
+                }
                 
                 # Install additional Kali dependencies
                 sudo apt-get install -y python3-dev libpq-dev
+                
+                # Ensure pipx bin is in PATH
+                export PATH="$HOME/.local/bin:$PATH"
+                echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+                echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc
             fi
             
             # Install Node.js 18+ if needed
@@ -437,6 +562,24 @@ kali_permission_fixes() {
             sudo chown -R $USER:$USER "$PWD" 2>/dev/null || true
         fi
         
+        # Fix Docker group permissions properly
+        if command -v docker >/dev/null 2>&1; then
+            if ! groups | grep -q docker; then
+                info "Adding user to docker group..."
+                sudo usermod -aG docker "$USER"
+                
+                # Try to refresh group membership without logout
+                newgrp docker 2>/dev/null || true
+                
+                warning "Docker group added. You may need to log out and back in, or run: newgrp docker"
+            fi
+            
+            # Ensure Docker socket has proper permissions
+            if [[ -S /var/run/docker.sock ]]; then
+                sudo chmod 666 /var/run/docker.sock 2>/dev/null || true
+            fi
+        fi
+        
         success "Kali permission fixes applied"
     fi
 }
@@ -463,6 +606,12 @@ if ! check_docker; then
     else
         warning "Skipping Docker installation"
     fi
+fi
+
+# Run Kali-specific fixes if needed
+if [[ "$DISTRO" == "kali" ]]; then
+    info "🐉 Running Kali-specific fixes..."
+    run_kali_fixes
 fi
 
 # Install other dependencies
@@ -564,6 +713,26 @@ if command -v docker >/dev/null 2>&1; then
 else
     echo -e "🐳 Docker: Not installed"
 fi
+
+# Kali-specific instructions
+if [[ "$DISTRO" == "kali" ]]; then
+    echo -e "${YELLOW}======================================${NC}"
+    echo -e "${YELLOW}🐉 Kali Linux Specific Notes 🐉${NC}"
+    echo -e "${YELLOW}======================================${NC}"
+    echo -e "🔧 If Docker permission issues:"
+    echo -e "   newgrp docker"
+    echo -e "   # OR log out and back in"
+    echo -e ""
+    echo -e "🐳 Docker Compose commands:"
+    echo -e "   docker compose up -d        (recommended)"
+    echo -e "   sudo docker compose up -d   (if permissions fail)"
+    echo -e ""
+    echo -e "🚨 If issues persist, run:"
+    echo -e "   ./kali-quick-fix.sh         (standalone fix script)"
+    echo -e "   ./deploy.sh                 (re-run with built-in fixes)"
+    echo -e "${YELLOW}======================================${NC}"
+fi
+
 echo -e "${GREEN}======================================${NC}"
 echo ""
 

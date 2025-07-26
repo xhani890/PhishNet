@@ -51,7 +51,7 @@ WORKDIR /app
 RUN apk add --no-cache \
     curl \
     postgresql-client \
-    redis-tools
+    redis
 
 # Copy built application
 COPY --from=builder --chown=phishnet:nodejs /app/package*.json ./
