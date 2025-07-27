@@ -136,8 +136,8 @@ jobs:
         uses: peter-evans/create-pull-request@v5
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: 'chore: update dependencies (${{ github.event.inputs.update_type || 'patch' }})'
-          title: '🔧 Dependency Updates (${{ github.event.inputs.update_type || 'patch' }})'
+          commit-message: 'chore: update dependencies (${{ github.event.inputs.update_type || ''patch'' }})'
+          title: '🔧 Dependency Updates (${{ github.event.inputs.update_type || ''patch'' }})'
           body: |
             ## 📦 Dependency Updates
             

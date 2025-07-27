@@ -41,9 +41,17 @@ jobs:
           cache: 'npm'
           cache-dependency-path: './phisnet/package-lock.json'
 
+      - name: Verify package-lock.json exists
+        working-directory: ./phisnet
+        run: |
+          if [ ! -f "package-lock.json" ]; then
+            echo "package-lock.json not found, running npm install to generate it"
+            npm install --package-lock-only
+          fi
+
       - name: Install dependencies
         working-directory: ./phisnet
-        run: npm ci
+        run: npm ci --prefer-offline
 
       - name: Run TypeScript check
         working-directory: ./phisnet
@@ -260,6 +268,10 @@ jobs:
   security-scan:
     name: Security Scan
     runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      actions: read
+      contents: read
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
