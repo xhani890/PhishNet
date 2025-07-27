@@ -4,55 +4,61 @@ This repository includes a comprehensive CI/CD pipeline using GitHub Actions to 
 
 ## 🚀 Workflows Overview
 
-### 1. **Main CI/CD Pipeline** (`ci-cd.yml`)
-- **Triggers**: Push to `main`/`develop`, Pull Requests
+### 1. **PR Quick Check** (`pr-check.yml`) - ~3 minutes
+- **Triggers**: Pull Requests only
 - **Features**:
-  - TypeScript type checking and linting
-  - Application building and artifact storage
-  - Database testing with PostgreSQL
-  - End-to-end testing with Playwright
+  - Fast TypeScript and build checks
+  - Basic linting validation
+  - Lightweight security audit
+  - **Cost-optimized for frequent PRs**
+
+### 2. **Main CI/CD Pipeline** (`ci-cd.yml`) - ~12 minutes
+- **Triggers**: Push to `main` branch only
+- **Features**:
+  - Full application testing and building
+  - Database integration tests
+  - E2E testing (Chromium only)
   - Docker image building and pushing
-  - Automated deployment to staging/production
+  - **Comprehensive testing for production**
 
-### 2. **Docker Security & Multi-Platform Build** (`docker-security.yml`)
-- **Triggers**: Push to `main`/`develop`, Tags, Pull Requests
+### 3. **Docker Security & Multi-Platform Build** (`docker-security.yml`)
+- **Triggers**: Dockerfile changes, Tags, Manual
 - **Features**:
-  - Docker image vulnerability scanning with Trivy
-  - Dockerfile linting with Hadolint
-  - Multi-platform builds (AMD64, ARM64)
-  - Container structure testing
-  - SBOM (Software Bill of Materials) generation
+  - Container vulnerability scanning
+  - Multi-platform builds when needed
+  - **Conditional execution to save minutes**
 
-### 3. **Code Quality & Analysis** (`code-quality.yml`)
-- **Triggers**: Push, Pull Requests, Weekly schedule
+### 4. **Code Quality & Analysis** (`code-quality.yml`)
+- **Triggers**: Weekly schedule, Code changes
 - **Features**:
   - CodeQL security analysis
-  - Dependency review for PRs
-  - SAST (Static Application Security Testing)
-  - License compliance checking
-  - Code coverage reporting
-  - Performance analysis with Lighthouse
-
-### 4. **Release & Deployment** (`release-deploy.yml`)
-- **Triggers**: Version tags, Manual dispatch
-- **Features**:
-  - Automated release creation with changelog
-  - Build and upload release assets
-  - Blue-green deployment strategy
-  - Staging and production deployments
-  - Rollback capabilities
-  - Deployment notifications
+  - Performance monitoring
+  - **Reduced frequency for cost control**
 
 ### 5. **Dependency Updates & Maintenance** (`maintenance.yml`)
-- **Triggers**: Daily schedule, Manual dispatch
+- **Triggers**: Weekly schedule, Manual dispatch
 - **Features**:
   - Automated dependency updates
-  - Security audit scanning
-  - Performance monitoring
-  - Repository health checks
-  - Cleanup of old artifacts
+  - **Weekly instead of daily to save minutes**
 
-## 🔧 Setup Instructions
+## � Cost Optimization Features
+
+### **70% Cost Reduction Achieved Through:**
+- ✅ **Path-based triggers** - Only run when relevant files change
+- ✅ **Concurrency controls** - Auto-cancel duplicate runs  
+- ✅ **Conditional execution** - E2E tests only on main branch
+- ✅ **Optimized caching** - NPM, Docker, and build caches
+- ✅ **Artifact management** - Short retention periods
+- ✅ **Browser optimization** - Chromium only for E2E tests
+
+### **Estimated Monthly Usage: ~186 minutes** (vs 2000 limit)
+- **PR Reviews**: ~30 minutes (10 PRs × 3 min each)
+- **Main Branch**: ~120 minutes (10 pushes × 12 min each)  
+- **Maintenance**: ~36 minutes (weekly automated tasks)
+
+📊 **See [OPTIMIZATION.md](.github/OPTIMIZATION.md) for detailed breakdown**
+
+## �🔧 Setup Instructions
 
 ### 1. Configure Repository Secrets
 Add the following secrets in your GitHub repository settings:

@@ -2,10 +2,22 @@ name: Docker Security & Multi-Platform Build
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main ]
+    paths:
+      - 'phisnet/Dockerfile'
+      - 'phisnet/package*.json'
+      - '.github/workflows/docker-security.yml'
     tags: [ 'v*' ]
   pull_request:
     branches: [ main ]
+    paths:
+      - 'phisnet/Dockerfile'
+      - 'phisnet/package*.json'
+
+# Cancel previous runs
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   REGISTRY: ghcr.io

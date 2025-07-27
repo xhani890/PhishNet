@@ -2,8 +2,8 @@ name: Dependency Updates & Maintenance
 
 on:
   schedule:
-    # Run daily at 2 AM UTC
-    - cron: '0 2 * * *'
+    # Run weekly on Monday at 2 AM UTC (reduced from daily)
+    - cron: '0 2 * * 1'
   workflow_dispatch:
     inputs:
       update_type:
@@ -16,6 +16,11 @@ on:
           - minor
           - major
           - all
+
+# Cancel previous runs
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   # Check for outdated dependencies

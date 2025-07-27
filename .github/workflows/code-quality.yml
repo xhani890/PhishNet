@@ -2,12 +2,29 @@ name: Code Quality & Analysis
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main ]
+    paths:
+      - 'phisnet/**/*.ts'
+      - 'phisnet/**/*.tsx'
+      - 'phisnet/**/*.js'
+      - 'phisnet/**/*.jsx'
+      - 'phisnet/package*.json'
   pull_request:
-    branches: [ main, develop ]
+    branches: [ main ]
+    paths:
+      - 'phisnet/**/*.ts'
+      - 'phisnet/**/*.tsx'
+      - 'phisnet/**/*.js'
+      - 'phisnet/**/*.jsx'
+      - 'phisnet/package*.json'
   schedule:
-    # Run weekly on Sunday at 2 AM UTC
+    # Run weekly on Sunday at 2 AM UTC (reduced frequency)
     - cron: '0 2 * * 0'
+
+# Cancel previous runs
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   # CodeQL Analysis

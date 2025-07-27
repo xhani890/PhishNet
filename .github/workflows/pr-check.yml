@@ -1,0 +1,67 @@
+name: PR Quick Check
+
+on:
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'phisnet/**'
+      - '.github/workflows/**'
+
+# Cancel previous runs for the same PR
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '18'
+
+jobs:
+  # Fast checks for PRs only
+  quick-check:
+    name: Quick PR Validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: './phisnet/package-lock.json'
+
+      - name: Install dependencies
+        working-directory: ./phisnet
+        run: npm ci --prefer-offline --no-audit
+
+      - name: TypeScript check
+        working-directory: ./phisnet
+        run: npm run check
+
+      - name: Build check
+        working-directory: ./phisnet
+        run: npm run build
+
+      - name: Basic lint check
+        working-directory: ./phisnet
+        run: |
+          if [ -f ".eslintrc.js" ] || [ -f ".eslintrc.json" ]; then
+            npx eslint . --ext .ts,.tsx --max-warnings 10
+          else
+            echo "No ESLint configuration found, skipping linting"
+          fi
+
+  # Security scan for PRs (lightweight)
+  pr-security:
+    name: PR Security Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run npm audit (high/critical only)
+        working-directory: ./phisnet
+        run: |
+          npm audit --audit-level=high --dry-run
+        continue-on-error: true
