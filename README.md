@@ -6,8 +6,9 @@
 [![TypeScript](https://img.shields.io/badge/typescript-%5E5.0.0-blue)](https://www.typescriptlang.org/)
 [![Docker](https://img.shields.io/badge/docker-ready-blue)](https://www.docker.com/)
 [![PostgreSQL](https://img.shields.io/badge/postgresql-%3E%3D15-blue)](https://www.postgresql.org/)
+[![CI/CD Pipeline](https://github.com/xhani890/PhishNet/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/xhani890/PhishNet/actions/workflows/ci-cd.yml)
 
-**🚀 One-Command Setup** • **🔒 Enterprise Grade** • **🐳 Docker Ready**
+**🚀 One-Command Setup** • **🔒 Enterprise Grade** • **🐳 Docker Ready** • **⚡ Automated CI/CD**
 
 </div>
 
