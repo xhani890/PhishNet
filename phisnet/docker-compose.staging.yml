@@ -1,0 +1,27 @@
+# Docker Compose configuration for staging environment
+version: '3.8'
+
+services:
+  app:
+    environment:
+      - NODE_ENV=staging
+      - LOG_LEVEL=info
+      - ENABLE_METRICS=true
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.phishnet-staging.rule=Host(`staging.phishnet.app`)"
+      - "traefik.http.routers.phishnet-staging.tls=true"
+      - "traefik.http.routers.phishnet-staging.tls.certresolver=letsencrypt"
+
+  database:
+    environment:
+      - POSTGRES_DB=phishnet_staging
+    volumes:
+      - postgres_staging_data:/var/lib/postgresql/data
+
+  redis:
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+
+volumes:
+  postgres_staging_data:
+    driver: local

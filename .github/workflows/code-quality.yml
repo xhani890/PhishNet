@@ -1,0 +1,255 @@
+name: Code Quality & Analysis
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    # Run weekly on Sunday at 2 AM UTC
+    - cron: '0 2 * * 0'
+
+jobs:
+  # CodeQL Analysis
+  codeql-analysis:
+    name: CodeQL Analysis
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [ 'javascript' ]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: './phisnet/package-lock.json'
+
+      - name: Install dependencies
+        working-directory: ./phisnet
+        run: npm ci
+
+      - name: Build project
+        working-directory: ./phisnet
+        run: npm run build
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{matrix.language}}"
+
+  # Dependency Review
+  dependency-review:
+    name: Dependency Review
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Dependency Review
+        uses: actions/dependency-review-action@v4
+        with:
+          base-ref: ${{ github.event.pull_request.base.sha || github.ref }}
+          head-ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+  # SAST (Static Application Security Testing)
+  sast-analysis:
+    name: SAST Analysis
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: './phisnet/package-lock.json'
+
+      - name: Install dependencies
+        working-directory: ./phisnet
+        run: npm ci
+
+      - name: Run ESLint Security
+        working-directory: ./phisnet
+        run: |
+          npx eslint . --ext .js,.jsx,.ts,.tsx --format @microsoft/eslint-formatter-sarif --output-file eslint-results.sarif
+        continue-on-error: true
+
+      - name: Upload ESLint results
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: ./phisnet/eslint-results.sarif
+          wait-for-processing: true
+
+      - name: Run Semgrep
+        uses: returntocorp/semgrep-action@v1
+        with:
+          config: >-
+            p/security-audit
+            p/secrets
+            p/typescript
+            p/javascript
+          generateSarif: "1"
+
+      - name: Upload Semgrep results
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: semgrep.sarif
+
+  # License Compliance
+  license-check:
+    name: License Compliance
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: './phisnet/package-lock.json'
+
+      - name: Install dependencies
+        working-directory: ./phisnet
+        run: npm ci
+
+      - name: Check licenses
+        working-directory: ./phisnet
+        run: |
+          npx license-checker --onlyAllow "MIT;Apache-2.0;BSD;ISC;Apache;Unlicense;WTFPL;CC0-1.0;CC-BY-3.0;CC-BY-4.0" --excludePackages "some-gpl-package" --summary
+
+      - name: Generate license report
+        working-directory: ./phisnet
+        run: |
+          npx license-checker --json > license-report.json
+
+      - name: Upload license report
+        uses: actions/upload-artifact@v4
+        with:
+          name: license-report
+          path: ./phisnet/license-report.json
+
+  # Code Coverage
+  code-coverage:
+    name: Code Coverage
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_DB: phishnet_test
+          POSTGRES_USER: phishnet_user
+          POSTGRES_PASSWORD: test_password
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: './phisnet/package-lock.json'
+
+      - name: Install dependencies
+        working-directory: ./phisnet
+        run: npm ci
+
+      - name: Setup environment
+        working-directory: ./phisnet
+        run: |
+          cp .env.example .env
+          echo "DATABASE_URL=postgresql://phishnet_user:test_password@localhost:5432/phishnet_test" >> .env
+          echo "NODE_ENV=test" >> .env
+
+      - name: Run tests with coverage
+        working-directory: ./phisnet
+        run: |
+          if [ -f "package.json" ] && grep -q '"test.*coverage"' package.json; then
+            npm run test:coverage
+          else
+            echo "No coverage tests configured"
+          fi
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          directory: ./phisnet/coverage/
+          fail_ci_if_error: false
+          verbose: true
+
+  # Performance Analysis
+  performance-analysis:
+    name: Performance Analysis
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: './phisnet/package-lock.json'
+
+      - name: Install dependencies
+        working-directory: ./phisnet
+        run: npm ci
+
+      - name: Bundle analysis
+        working-directory: ./phisnet
+        run: |
+          # Analyze bundle size
+          npm run build
+          npx bundlesize --enable-github-checks
+
+      - name: Performance audit
+        working-directory: ./phisnet
+        run: |
+          # Install lighthouse CLI
+          npm install -g lighthouse
+          
+          # Build and start the app
+          npm run build
+          npm run start &
+          
+          # Wait for app to start
+          sleep 15
+          
+          # Run lighthouse audit
+          lighthouse http://localhost:3000 --output=json --output-path=lighthouse-report.json --chrome-flags="--headless --no-sandbox --disable-dev-shm-usage"
+
+      - name: Upload performance report
+        uses: actions/upload-artifact@v4
+        with:
+          name: performance-report
+          path: ./phisnet/lighthouse-report.json

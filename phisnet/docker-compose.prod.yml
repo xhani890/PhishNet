@@ -1,0 +1,68 @@
+# Docker Compose configuration for production environment
+version: '3.8'
+
+services:
+  app:
+    environment:
+      - NODE_ENV=production
+      - LOG_LEVEL=warn
+      - ENABLE_METRICS=true
+      - ENABLE_PROFILING=false
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 512M
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.phishnet.rule=Host(`phishnet.app`)"
+      - "traefik.http.routers.phishnet.tls=true"
+      - "traefik.http.routers.phishnet.tls.certresolver=letsencrypt"
+      - "traefik.http.services.phishnet.loadbalancer.server.port=3000"
+
+  database:
+    environment:
+      - POSTGRES_DB=phishnet_production
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 1G
+    volumes:
+      - postgres_prod_data:/var/lib/postgresql/data
+      - ./backups:/backups
+
+  redis:
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 512M
+
+  # Production-specific services
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/prod.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - app
+
+volumes:
+  postgres_prod_data:
+    driver: local
