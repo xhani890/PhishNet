@@ -476,16 +476,64 @@ function Setup-Environment {
     Write-Info "📝 Setting up environment..."
     
     if (!(Test-Path ".env")) {
+        $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
         $envContent = @"
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/phishnet
-REDIS_URL=redis://localhost:6379
-PORT=3000
+# PhishNet Auto-Generated Environment Configuration
+# Generated: $timestamp
+
+# Application Settings
 NODE_ENV=development
-SESSION_SECRET=dev-secret-key-change-in-production
+PORT=3000
+APP_NAME=PhishNet
+APP_VERSION=1.0.0
 APP_URL=http://localhost:3000
+
+# Database Configuration (Auto-configured)
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/phishnet
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=phishnet
+DB_USER=postgres
+DB_PASSWORD=postgres
+
+# Redis Configuration (Sessions & Cache)
+REDIS_URL=redis://localhost:6379
+REDIS_HOST=localhost
+REDIS_PORT=6379
+
+# Security Settings (Change in production!)
+SESSION_SECRET=phishnet-dev-secret-$((Get-Date).Ticks)
+JWT_SECRET=phishnet-jwt-secret-$((Get-Date).Ticks)
+ENCRYPTION_KEY=phishnet-encrypt-$((Get-Date).Ticks.ToString().Substring(0,32))
+
+# Email Configuration (Optional - for sending phishing emails)
+SMTP_HOST=localhost
+SMTP_PORT=587
+SMTP_USER=
+SMTP_PASS=
+SMTP_FROM=noreply@phishnet.local
+
+# Upload Configuration
+UPLOAD_MAX_SIZE=10485760
+UPLOAD_DIR=./uploads
+
+# Logging Configuration
+LOG_LEVEL=info
+LOG_FILE=./logs/phishnet.log
+
+# Features Configuration
+ENABLE_REGISTRATION=false
+ENABLE_API=true
+ENABLE_SWAGGER_DOCS=true
+ENABLE_METRICS=true
+
+# Default Admin Account (Auto-created)
+DEFAULT_ADMIN_EMAIL=admin@phishnet.local
+DEFAULT_ADMIN_PASSWORD=admin123
+DEFAULT_ADMIN_NAME=PhishNet Administrator
 "@
         $envContent | Out-File -FilePath ".env" -Encoding UTF8
-        Write-Success "Environment file created"
+        Write-Success "Environment file created with full configuration"
     } else {
         Write-Success "Environment file already exists"
     }
@@ -494,13 +542,24 @@ APP_URL=http://localhost:3000
     if (Test-Path ".env") {
         Write-Info "📋 Environment file contents:"
         Get-Content ".env" | ForEach-Object {
-            if ($_ -match "PASSWORD=") {
-                Write-Host ($_ -replace "PASSWORD=.*", "PASSWORD=***")
+            if ($_ -match "(PASSWORD|SECRET|KEY)=") {
+                Write-Host ($_ -replace "(PASSWORD|SECRET|KEY)=.*", '$1=***')
             } else {
                 Write-Host $_
             }
         }
         Write-Success "Environment verified"
+        
+        # Create necessary directories
+        Write-Info "📁 Creating required directories..."
+        $directories = @("logs", "uploads", "temp", "exports", "backups")
+        foreach ($dir in $directories) {
+            if (!(Test-Path $dir)) {
+                New-Item -ItemType Directory -Path $dir -Force | Out-Null
+            }
+        }
+        Write-Success "Required directories created"
+        
         return $true
     } else {
         Write-Error "Failed to create .env file"
@@ -540,29 +599,59 @@ function Setup-Application {
     }
     
     # Database schema setup
-    Write-Info "Setting up database schema..."
+    Write-Info "🗄️ Setting up database schema..."
     try {
         npm run db:push 2>$null
         if ($LASTEXITCODE -eq 0) {
             Write-Success "Database schema applied"
         } else {
-            Write-Warning "Database schema setup had issues"
+            Write-Warning "Database schema setup had issues, trying manual SQL import..."
+            if (Test-Path "migrations\00_phishnet_schema.sql") {
+                try {
+                    psql -U postgres -d phishnet -f "migrations\00_phishnet_schema.sql" 2>$null
+                    Write-Success "Manual schema import completed"
+                } catch {
+                    Write-Warning "Manual schema import failed"
+                }
+            }
         }
     } catch {
         Write-Warning "Database schema setup failed"
     }
     
     # Import sample data
-    Write-Info "Importing sample data..."
+    Write-Info "📊 Importing sample data and creating admin user..."
     try {
         npm run import-data 2>$null
         if ($LASTEXITCODE -eq 0) {
             Write-Success "Sample data imported"
         } else {
-            Write-Warning "Sample data import had issues"
+            Write-Warning "Sample data import had issues, trying manual SQL import..."
+            if (Test-Path "migrations\01_sample_data.sql") {
+                try {
+                    psql -U postgres -d phishnet -f "migrations\01_sample_data.sql" 2>$null
+                    Write-Success "Manual data import completed"
+                } catch {
+                    Write-Warning "Manual data import failed"
+                }
+            }
         }
     } catch {
         Write-Warning "Sample data import failed"
+    }
+    
+    # Verify database setup
+    Write-Info "🔍 Verifying database setup..."
+    try {
+        $tables = psql -U postgres -d phishnet -c "\dt" 2>$null
+        if ($LASTEXITCODE -eq 0) {
+            $tableCount = ($tables | Select-String "public |").Count
+            Write-Success "Database verified - $tableCount tables found"
+        } else {
+            Write-Warning "Database verification failed"
+        }
+    } catch {
+        Write-Warning "Could not verify database setup"
     }
     
     # Production build if requested

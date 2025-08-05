@@ -710,25 +710,78 @@ success "Database setup complete"
 info "📝 Setting up environment..."
 if [[ ! -f ".env" ]]; then
     cat > .env << EOF
-DATABASE_URL=postgresql://postgres@localhost:5432/phishnet
-REDIS_URL=redis://localhost:6379
-PORT=3000
+# PhishNet Auto-Generated Environment Configuration
+# Generated: $(date)
+
+# Application Settings
 NODE_ENV=development
-SESSION_SECRET=dev-secret-key-change-in-production
+PORT=3000
+APP_NAME=PhishNet
+APP_VERSION=1.0.0
 APP_URL=http://localhost:3000
+
+# Database Configuration (Auto-configured)
+DATABASE_URL=postgresql://postgres@localhost:5432/phishnet
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=phishnet
+DB_USER=postgres
+DB_PASSWORD=
+
+# Redis Configuration (Sessions & Cache)
+REDIS_URL=redis://localhost:6379
+REDIS_HOST=localhost
+REDIS_PORT=6379
+
+# Security Settings (Change in production!)
+SESSION_SECRET=phishnet-dev-secret-$(date +%s)
+JWT_SECRET=phishnet-jwt-secret-$(date +%s)
+ENCRYPTION_KEY=phishnet-encrypt-$(date +%s | sha256sum | head -c 32)
+
+# Email Configuration (Optional - for sending phishing emails)
+SMTP_HOST=localhost
+SMTP_PORT=587
+SMTP_USER=
+SMTP_PASS=
+SMTP_FROM=noreply@phishnet.local
+
+# Upload Configuration
+UPLOAD_MAX_SIZE=10485760
+UPLOAD_DIR=./uploads
+
+# Logging Configuration
+LOG_LEVEL=info
+LOG_FILE=./logs/phishnet.log
+
+# Features Configuration
+ENABLE_REGISTRATION=false
+ENABLE_API=true
+ENABLE_SWAGGER_DOCS=true
+ENABLE_METRICS=true
+
+# Default Admin Account (Auto-created)
+DEFAULT_ADMIN_EMAIL=admin@phishnet.local
+DEFAULT_ADMIN_PASSWORD=admin123
+DEFAULT_ADMIN_NAME=PhishNet Administrator
 EOF
-    success "Environment file created"
+    success "Environment file created with full configuration"
 fi
 
 # Verify .env file
 if [[ -f ".env" ]]; then
     info "📋 Environment file contents:"
-    cat .env | sed 's/PASSWORD=.*/PASSWORD=***/' # Hide password in output
+    cat .env | sed 's/PASSWORD=.*/PASSWORD=***/' | sed 's/SECRET=.*/SECRET=***/' | sed 's/KEY=.*/KEY=***/' # Hide secrets in output
     success "Environment verified"
 else
     error "Failed to create .env file"
     exit 1
 fi
+
+# Create necessary directories
+info "📁 Creating required directories..."
+mkdir -p logs uploads temp exports backups 2>/dev/null
+chmod 755 logs uploads temp exports backups 2>/dev/null
+success "Required directories created"
 
 # Install npm dependencies
 info "🚀 Setting up PhishNet application..."
@@ -746,11 +799,32 @@ fi
 
 npm install
 
-# Database schema
-npm run db:push 2>/dev/null || warning "Database schema setup had issues"
+# Database schema and data setup
+info "🗄️ Setting up database schema..."
+npm run db:push 2>/dev/null || {
+    warning "Database schema setup had issues, trying manual SQL import..."
+    if [[ -f "migrations/00_phishnet_schema.sql" ]]; then
+        sudo -u postgres psql -d phishnet -f migrations/00_phishnet_schema.sql 2>/dev/null || warning "Manual schema import failed"
+    fi
+}
 
-# Sample data
-npm run import-data 2>/dev/null || warning "Sample data import had issues"
+# Sample data import
+info "📊 Importing sample data and creating admin user..."
+npm run import-data 2>/dev/null || {
+    warning "Sample data import had issues, trying manual SQL import..."
+    if [[ -f "migrations/01_sample_data.sql" ]]; then
+        sudo -u postgres psql -d phishnet -f migrations/01_sample_data.sql 2>/dev/null || warning "Manual data import failed"
+    fi
+}
+
+# Verify database setup
+info "🔍 Verifying database setup..."
+if sudo -u postgres psql -d phishnet -c "\dt" >/dev/null 2>&1; then
+    TABLE_COUNT=$(sudo -u postgres psql -d phishnet -c "\dt" 2>/dev/null | grep -c "public |" || echo "0")
+    success "Database verified - $TABLE_COUNT tables found"
+else
+    warning "Database verification failed"
+fi
 
 # Production build
 if [[ "$PRODUCTION" == true ]]; then

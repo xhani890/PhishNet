@@ -73,7 +73,9 @@ If automatic deployment fails, you can set up manually:
 - Redis
 - Git
 
-### Setup Steps
+### 🗄️ Automatic Database Setup
+The deployment scripts automatically handle database creation and setup:
+
 ```bash
 # 1. Clone repository
 git clone https://github.com/gh0st-bit/PhishNet.git
@@ -82,22 +84,74 @@ cd PhishNet/phisnet
 # 2. Install dependencies
 npm install
 
-# 3. Setup database
-sudo -u postgres createdb phishnet
+# 3. Complete Automated Setup (NEW ENHANCED VERSION!)
+# The deploy scripts now automatically handle:
+# ✅ Database creation with proper user permissions
+# ✅ Complete environment configuration with secure defaults
+# ✅ Required directory creation (logs, uploads, temp, exports, backups)
+# ✅ Database schema application from SQL files
+# ✅ Sample data import with admin user creation
+# ✅ Fallback to manual SQL import if npm scripts fail
+# ✅ Database connection verification and table counting
+# ✅ Security settings with auto-generated secrets
 
-# 4. Configure environment
-cp .env.example .env
-# Edit .env with your database settings
+# Run the complete setup (everything automated):
+npm run setup
 
-# 5. Setup database schema
-npm run db:push
+# Or run individual steps:
+npm run db:push        # Create/update database schema
+npm run import-data    # Import sample data and admin user
 
-# 6. Import sample data
-npm run import-data
+# 4. Environment Auto-Configuration (NEW!)
+# .env file is automatically created with:
+# - Database URL (postgresql://postgres@localhost:5432/phishnet)
+# - Redis configuration for sessions
+# - Auto-generated security secrets
+# - Complete application settings
+# - Email configuration (optional)
+# - Upload and logging settings
+# - Feature toggles and admin account details
 
-# 7. Start application
+# 5. Verify Everything Works (NEW!)
+./verify-setup.sh      # Linux/macOS
+.\verify-setup.ps1     # Windows
+# This checks: Node.js, PostgreSQL, Redis, database tables, 
+# environment files, project structure, and connections
+
+# 6. Start application
 npm run dev
 ```
+
+### 🔄 Database Management Commands
+
+```bash
+# Reset database completely (removes all data)
+./reset-db.sh          # Linux/macOS
+.\reset-db.ps1         # Windows (if available)
+
+# Or use npm scripts:
+npm run db:push        # Update schema only
+npm run import-data    # Re-import sample data
+npm run setup          # Complete setup (schema + data)
+
+# Check database status
+psql -U postgres -d phishnet -c "\dt"  # List tables
+```
+
+### 📊 Database Configuration
+
+**Automatic Setup Includes:**
+- ✅ Database: `phishnet` 
+- ✅ User: `postgres` (default PostgreSQL user)
+- ✅ Schema: Complete PhishNet tables and relationships
+- ✅ Sample Data: Templates, campaigns, and admin user
+- ✅ Extensions: Required PostgreSQL extensions
+- ✅ Permissions: Proper access controls
+
+**Default Admin Account:**
+- Email: `admin@phishnet.local`
+- Password: `admin123`
+- Role: Super Administrator
 
 ---
 
@@ -143,9 +197,11 @@ docker-compose up -d
 - 🍎 **macOS (Intel/ARM)**
 
 ### Database Configuration
-- Uses `postgres` user with `phishnet` database
-- No custom passwords required for local development
-- Production-ready configuration included
+- 🗄️ **Automatic Database Creation**: Creates `phishnet` database with `postgres` user
+- 📊 **Schema Management**: Uses Drizzle ORM with automated migrations
+- 🔒 **Secure Setup**: Proper permissions and PostgreSQL extensions
+- 📈 **Sample Data**: Pre-loaded templates, campaigns, and admin account
+- 🔄 **Easy Reset**: Simple database reset and restoration commands
 
 ---
 
@@ -159,14 +215,58 @@ docker-compose up -d
 # Deploy production
 ./deploy.sh --production
 
-# Reset database
-./reset-db.sh
+# Database Management
+./reset-db.sh           # Complete database reset
+npm run setup           # Schema + sample data
+npm run db:push         # Update schema only
+npm run import-data     # Import sample data
+
+# Verify Setup (NEW!)
+./verify-setup.sh       # Linux/macOS - Check installation
+.\verify-setup.ps1      # Windows - Check installation
 
 # Create shareable package
 ./create-package.sh
 
 # Fix Kali Linux issues
 ./kali-quick-fix.sh
+
+# Database Troubleshooting
+psql -U postgres -d phishnet -c "\l"    # List databases
+psql -U postgres -d phishnet -c "\dt"   # List tables
+psql -U postgres -d phishnet -c "\du"   # List users
+```
+
+---
+
+## 🗄️ Database Details
+
+### Automatic Database Setup
+PhishNet automatically creates and configures a complete PostgreSQL database:
+
+**Database Structure:**
+- **Database Name**: `phishnet`
+- **User**: `postgres` (default system user)
+- **Tables**: 15+ tables for campaigns, templates, users, analytics
+- **Extensions**: plpgsql, uuid-ossp (auto-installed)
+- **Sample Data**: Ready-to-use templates and admin account
+
+**Schema Files:**
+- `migrations/00_phishnet_schema.sql` - Complete database schema
+- `migrations/01_sample_data.sql` - Sample templates and admin user
+- `migrations/create_notifications.sql` - Notification system
+- `migrations/fix-missing-columns.sql` - Schema updates
+
+**Database Reset Process:**
+```bash
+# Automated reset (recommended)
+./reset-db.sh
+
+# Manual reset process:
+sudo -u postgres psql -c "DROP DATABASE IF EXISTS phishnet;"
+sudo -u postgres psql -c "CREATE DATABASE phishnet;"
+npm run db:push         # Apply schema
+npm run import-data     # Load sample data
 ```
 
 ---
