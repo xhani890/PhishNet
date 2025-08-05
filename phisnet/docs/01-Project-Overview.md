@@ -4,8 +4,7 @@
 - **Project Name:** PhishNet
 - **Version:** 1.0.0
 - **Type:** Phishing Simulation & Security Awareness Platform
-- **Academic Level:** Final Year Project (CYB-8-1)
-- **Institution:** Riphah International University
+- **Project Type:** PhishNet Project
 - **Development Period:** 2024-2025
 
 ## 🎯 Project Description
@@ -149,7 +148,7 @@ PhishNet is a comprehensive phishing simulation and security awareness training 
    - Risk scoring algorithms
    - Predictive vulnerability assessment
 
-## 🎓 Academic Contribution
+## � Project Contribution
 
 ### Research Components
 1. **Cybersecurity Education Effectiveness**
@@ -242,5 +241,5 @@ This documentation package includes:
 
 **Document Version:** 1.0
 **Last Updated:** July 25, 2025
-**Author:** Final Year Student - CYB-8-1
-**Institution:** Riphah International University
+**Author:** PhishNet Project Team
+**Project:** PhishNet Advanced Phishing Simulation Platform

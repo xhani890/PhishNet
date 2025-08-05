@@ -589,5 +589,5 @@ RATE_LIMIT_WINDOW=900000
 
 **Document Version:** 1.0
 **Last Updated:** July 25, 2025
-**Author:** Final Year Student - CYB-8-1
-**Institution:** Riphah International University
+**Author:** PhishNet Project Team
+**Project:** PhishNet Advanced Phishing Simulation Platform

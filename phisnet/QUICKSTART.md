@@ -95,8 +95,8 @@ cd PhishNet\phisnet
 - **User:** `john.doe@corporate.example.com` / `user123`
 
 #### Education Organization  
-- **Admin:** `it.admin@university.edu` / `admin123`
-- **User:** `jane.smith@university.edu` / `user123`
+- **Admin:** `it.admin@company.com` / `admin123`
+- **User:** `jane.smith@company.com` / `user123`
 
 #### Healthcare Organization
 - **Admin:** `security@hospital.org` / `admin123`
