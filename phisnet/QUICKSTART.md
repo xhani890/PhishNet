@@ -9,25 +9,66 @@
 
 ## 🎯 Choose Your Setup Method
 
-### � Kali Linux (Special Instructions)
+### 🪟 Windows (PowerShell/Batch)
 
-If you're using Kali Linux, PostgreSQL might need special configuration:
+The easiest way to deploy on Windows:
+
+```powershell
+# 1. Clone the repository
+git clone https://github.com/gh0st-bit/PhishNet.git
+cd PhishNet/phisnet
+
+# 2. Run deployment (automatically installs all dependencies)
+.\deploy.ps1
+
+# 3. Start PhishNet
+.\start.ps1
+```
+
+**Alternative using Batch files:**
+```cmd
+deploy.bat
+start.bat
+```
+
+**📋 What gets installed:** Node.js, PostgreSQL, Redis, Git, Docker (optional)  
+**🔐 Database Credentials:** `postgres` / `postgres`
+
+### 🐧 Linux/macOS (Universal)
+
+Works on Ubuntu, Debian, CentOS, Fedora, Arch, macOS:
+
+```bash
+# 1. Clone the repository
+git clone https://github.com/gh0st-bit/PhishNet.git
+cd PhishNet/phisnet
+
+# 2. Run universal deployment
+chmod +x deploy.sh
+./deploy.sh
+
+# 3. Start PhishNet
+./start.sh
+```
+
+### 🐉 Kali Linux (Special Instructions)
+
+If you're using Kali Linux, the universal script includes built-in fixes:
 
 ```bash
 # 1. Clone the repository  
 git clone https://github.com/gh0st-bit/PhishNet.git
 cd PhishNet/phisnet
 
-# 2. Fix PostgreSQL issues first (Kali Linux specific)
-chmod +x scripts/fix-postgresql-kali.sh
-./scripts/fix-postgresql-kali.sh
+# 2. Run deployment (includes Kali-specific fixes)
+chmod +x deploy.sh
+./deploy.sh
 
-# 3. Run main setup
-chmod +x scripts/setup.sh
-./scripts/setup.sh
+# 3. Start PhishNet
+./start.sh
 ```
 
-**🔐 Database Credentials:** `phishnet_user` / `kali` (password will be displayed during setup)
+**🔐 Database Credentials:** `postgres` / `postgres` (standardized across all platforms)
 
 ### �🐳 Option 1: Docker (Recommended)
 **Best for:** Production, Testing, Easy Setup
