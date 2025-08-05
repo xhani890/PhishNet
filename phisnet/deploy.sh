@@ -804,3 +804,253 @@ if [[ "$PRODUCTION" != true ]]; then
         info "To start later: ./start.sh"
     fi
 fi
+
+# Create friend deployment package automatically
+create_friend_package() {
+    info "🎁 Creating friend deployment package..."
+    
+    # Check if package already exists from create-package.sh
+    EXISTING_PACKAGE=$(find . -maxdepth 1 -name "PhishNet-Package-*" -type d 2>/dev/null | head -1)
+    
+    if [[ -n "$EXISTING_PACKAGE" ]]; then
+        info "Found existing package: $EXISTING_PACKAGE"
+        PACKAGE_DIR="$EXISTING_PACKAGE"
+    else
+        # Create new package directory
+        TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+        PACKAGE_DIR="PhishNet-Package-Linux-$TIMESTAMP"
+        mkdir -p "$PACKAGE_DIR"
+        info "Created new package: $PACKAGE_DIR"
+    fi
+    
+    # Essential files for friend deployment
+    ESSENTIAL_FILES=(
+        "deploy.sh"
+        "start.sh"
+        "deploy.ps1"
+        "deploy.bat"
+        "start.ps1" 
+        "start.bat"
+        "test-deployment.ps1"
+        "QUICK-FRIEND-SETUP.md"
+        "FRIEND-DEPLOYMENT-GUIDE.md"
+        "WINDOWS-SETUP.md"
+        "UNIVERSAL-SETUP.md"
+        "package.json"
+        "docker-compose.yml"
+        "Dockerfile"
+        ".env.example"
+    )
+    
+    info "📋 Adding essential files to package..."
+    for file in "${ESSENTIAL_FILES[@]}"; do
+        if [[ -f "$file" ]]; then
+            cp "$file" "$PACKAGE_DIR/" 2>/dev/null || true
+            success "Added: $file"
+        fi
+    done
+    
+    # Copy source directories
+    SOURCE_DIRS=("client" "server" "shared" "migrations" "docs")
+    for dir in "${SOURCE_DIRS[@]}"; do
+        if [[ -d "$dir" ]]; then
+            cp -r "$dir" "$PACKAGE_DIR/" 2>/dev/null || true
+            success "Added directory: $dir"
+        fi
+    done
+    
+    # Copy configuration files
+    CONFIG_FILES=("tsconfig.json" "tailwind.config.ts" "vite.config.ts" "drizzle.config.ts" "components.json")
+    for file in "${CONFIG_FILES[@]}"; do
+        if [[ -f "$file" ]]; then
+            cp "$file" "$PACKAGE_DIR/" 2>/dev/null || true
+            success "Added config: $file"
+        fi
+    done
+    
+    # Create universal README for the package
+    cat > "$PACKAGE_DIR/README.md" << 'EOF'
+# 🎣 PhishNet Universal Deployment Package
+
+## Quick Setup Guide
+
+### For Windows Users (Recommended)
+1. Extract to `C:\PhishNet\`
+2. Open **PowerShell as Administrator**
+3. Navigate: `cd C:\PhishNet\phishnet`
+4. Deploy: `.\deploy.ps1`
+5. Start: `.\start.ps1`
+6. Access: http://localhost:3000
+
+### For Linux/macOS Users
+1. Extract package: `unzip PhishNet-Package-*.zip`
+2. Navigate: `cd PhishNet-Package-*/`
+3. Deploy: `chmod +x deploy.sh && ./deploy.sh`
+4. Start: `./start.sh`
+5. Access: http://localhost:3000
+
+### For Docker Users (Any OS)
+1. Extract package and navigate to folder
+2. Run: `docker compose up -d`
+3. Access: http://localhost:3000
+
+## Default Login Credentials
+- **URL**: http://localhost:3000
+- **Email**: admin@phishnet.local
+- **Password**: admin123
+
+## What Gets Auto-Installed
+✅ Node.js 18+ (JavaScript runtime)
+✅ PostgreSQL (Database)
+✅ Redis (Cache & Sessions)
+✅ Git (Version control)
+✅ Docker (Optional containerization)
+
+## Deployment Features
+- **Auto-Detection**: Automatically detects your operating system
+- **Smart Installation**: Uses system package managers (apt, brew, choco, etc.)
+- **Error Handling**: Comprehensive error detection and fixes
+- **Multi-Platform**: Works on Windows, Linux, macOS
+- **Zero Configuration**: Everything pre-configured and ready to go
+
+## Quick Troubleshooting
+
+### Windows Issues
+```powershell
+# Execution policy error
+Set-ExecutionPolicy Bypass -Scope Process -Force
+
+# Port 3000 busy
+netstat -ano | findstr :3000
+taskkill /PID <PID> /F
+
+# Run as Administrator
+Right-click PowerShell → "Run as Administrator"
+```
+
+### Linux/macOS Issues
+```bash
+# Permission issues
+chmod +x *.sh
+
+# Service issues  
+sudo systemctl status postgresql redis-server
+
+# Restart deployment
+./deploy.sh
+```
+
+### Universal Issues
+- **Internet connection required** for downloading dependencies
+- **Administrator/sudo privileges needed** for installing software
+- **Wait 2-3 minutes** after deployment before starting
+- **Check firewall settings** if can't access localhost:3000
+
+## Advanced Options
+
+### Production Deployment
+```bash
+# Linux/macOS
+./deploy.sh --production
+
+# Windows
+.\deploy.ps1 -Production
+```
+
+### Skip Dependencies (if already installed)
+```bash
+# Linux/macOS
+./deploy.sh --skip-deps
+
+# Windows  
+.\deploy.ps1 -SkipDeps
+```
+
+### Test Deployment
+```bash
+# Windows only
+.\test-deployment.ps1
+```
+
+## Package Contents
+- ✅ Complete PhishNet source code
+- ✅ Automated deployment scripts (Windows & Linux)
+- ✅ Database schema and migrations
+- ✅ Pre-configured Docker setup
+- ✅ Comprehensive documentation
+- ✅ Troubleshooting guides
+- ✅ Sample configurations
+
+## Support & Documentation
+- **Windows Guide**: `WINDOWS-SETUP.md`
+- **Quick Reference**: `QUICK-FRIEND-SETUP.md`
+- **Detailed Guide**: `FRIEND-DEPLOYMENT-GUIDE.md`
+- **Universal Setup**: `UNIVERSAL-SETUP.md`
+
+**🎯 This package contains everything needed for a complete PhishNet deployment on any operating system!**
+EOF
+    
+    success "Added: README.md"
+    
+    # Make scripts executable
+    chmod +x "$PACKAGE_DIR"/*.sh 2>/dev/null || true
+    
+    # Try to create ZIP/tar archive
+    if command -v zip >/dev/null 2>&1; then
+        ZIP_FILE="${PACKAGE_DIR}.zip"
+        if [[ -f "$ZIP_FILE" ]]; then
+            rm "$ZIP_FILE"
+        fi
+        
+        cd "$PACKAGE_DIR" && zip -r "../$ZIP_FILE" . >/dev/null 2>&1 && cd ..
+        if [[ -f "$ZIP_FILE" ]]; then
+            FILE_SIZE=$(du -h "$ZIP_FILE" | cut -f1)
+            echo ""
+            echo -e "${GREEN}======================================${NC}"
+            echo -e "${GREEN}🎉 Friend Package Created Successfully! 🎉${NC}"
+            echo -e "${GREEN}======================================${NC}"
+            echo -e "📦 Package: $ZIP_FILE"
+            echo -e "📏 Size: $FILE_SIZE"
+            echo ""
+            echo -e "${BLUE}📤 To share with friends:${NC}"
+            echo -e "   1. Send them: $ZIP_FILE"
+            echo -e "   2. Windows: Extract → PowerShell Admin → .\\deploy.ps1"
+            echo -e "   3. Linux/Mac: Extract → chmod +x deploy.sh → ./deploy.sh"
+            echo -e "${GREEN}======================================${NC}"
+            echo ""
+        fi
+    elif command -v tar >/dev/null 2>&1; then
+        TAR_FILE="${PACKAGE_DIR}.tar.gz"
+        if [[ -f "$TAR_FILE" ]]; then
+            rm "$TAR_FILE"
+        fi
+        
+        tar -czf "$TAR_FILE" "$PACKAGE_DIR" >/dev/null 2>&1
+        if [[ -f "$TAR_FILE" ]]; then
+            FILE_SIZE=$(du -h "$TAR_FILE" | cut -f1)
+            echo ""
+            echo -e "${GREEN}======================================${NC}"
+            echo -e "${GREEN}🎉 Friend Package Created Successfully! 🎉${NC}"
+            echo -e "${GREEN}======================================${NC}"
+            echo -e "📦 Package: $TAR_FILE"
+            echo -e "📏 Size: $FILE_SIZE"
+            echo ""
+            echo -e "${BLUE}📤 To share with friends:${NC}"
+            echo -e "   1. Send them: $TAR_FILE"
+            echo -e "   2. Extract: tar -xzf $TAR_FILE"
+            echo -e "   3. Deploy: cd $PACKAGE_DIR && ./deploy.sh"
+            echo -e "${GREEN}======================================${NC}"
+            echo ""
+        fi
+    else
+        warning "zip/tar not available. Package folder ready: $PACKAGE_DIR"
+        info "You can manually compress the folder to share with friends"
+    fi
+    
+    return 0
+}
+
+# Always create friend package after successful deployment
+echo ""
+info "🎁 Creating shareable package for friends..."
+create_friend_package

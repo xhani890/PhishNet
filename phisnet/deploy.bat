@@ -38,8 +38,13 @@ if errorlevel 1 (
 echo ℹ️ PowerShell found, launching deployment script...
 echo.
 
+REM Set execution policy for smooth deployment
+echo ℹ️ Setting PowerShell execution policy for smooth deployment...
+powershell -Command "Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process -Force" >nul 2>&1
+powershell -Command "Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser -Force" >nul 2>&1
+
 REM Run the PowerShell deployment script with execution policy bypass
-powershell -ExecutionPolicy Bypass -File "deploy.ps1" %*
+powershell -ExecutionPolicy Bypass -NoProfile -File "deploy.ps1" %*
 
 if errorlevel 1 (
     echo.

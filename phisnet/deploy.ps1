@@ -40,16 +40,23 @@ if (!(Test-Path "package.json")) {
     exit 1
 }
 
-# Set execution policy if needed
+# Set execution policy for smooth deployment
 try {
     $executionPolicy = Get-ExecutionPolicy
-    if ($executionPolicy -eq "Restricted") {
-        Write-Warning "PowerShell execution policy is Restricted. Attempting to set RemoteSigned..."
-        Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser -Force
-        Write-Success "Execution policy updated to RemoteSigned"
+    if ($executionPolicy -eq "Restricted" -or $executionPolicy -eq "AllSigned") {
+        Write-Warning "PowerShell execution policy is $executionPolicy. Setting to Bypass for deployment..."
+        Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process -Force
+        Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser -Force -ErrorAction SilentlyContinue
+        Write-Success "Execution policy set to Bypass for this session and RemoteSigned for user"
     }
 } catch {
-    Write-Warning "Could not change execution policy. You may need to run as Administrator."
+    Write-Info "Attempting to bypass execution policy for this session..."
+    try {
+        Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process -Force
+        Write-Success "Execution policy bypassed for this deployment"
+    } catch {
+        Write-Warning "Could not change execution policy. Deployment may still work."
+    }
 }
 
 # Admin check
@@ -683,3 +690,175 @@ if (!$Production) {
         Write-Info "To start later: .\start.ps1"
     }
 }
+
+# Create friend deployment package automatically
+function Create-FriendPackage {
+    Write-Info "📦 Creating friend deployment package..."
+    
+    # Check if package directory exists from bash script
+    $packageDir = Get-ChildItem -Directory "PhishNet-Package-*" -ErrorAction SilentlyContinue | Select-Object -First 1
+    
+    if (!$packageDir) {
+        Write-Info "No existing package found. Creating new package..."
+        # Create a simple package directory
+        $timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
+        $packageDir = New-Item -ItemType Directory -Name "PhishNet-Package-Windows-$timestamp" -Force
+        Write-Info "Created package directory: $($packageDir.Name)"
+    }
+    
+    # Essential files for friend deployment
+    $essentialFiles = @(
+        "deploy.ps1",
+        "deploy.bat", 
+        "start.ps1",
+        "start.bat",
+        "test-deployment.ps1",
+        "QUICK-FRIEND-SETUP.md",
+        "FRIEND-DEPLOYMENT-GUIDE.md", 
+        "WINDOWS-SETUP.md",
+        "package.json",
+        "docker-compose.yml",
+        "Dockerfile",
+        ".env.example"
+    )
+    
+    Write-Info "Adding essential files to package..."
+    foreach ($file in $essentialFiles) {
+        if (Test-Path $file) {
+            Copy-Item $file "$($packageDir.Name)/" -Force -ErrorAction SilentlyContinue
+            Write-Host "  ✓ Added: $file" -ForegroundColor Green
+        }
+    }
+    
+    # Copy source directories
+    $sourceDirs = @("client", "server", "shared", "migrations", "docs")
+    foreach ($dir in $sourceDirs) {
+        if (Test-Path $dir) {
+            Copy-Item $dir "$($packageDir.Name)/" -Recurse -Force -ErrorAction SilentlyContinue
+            Write-Host "  ✓ Added directory: $dir" -ForegroundColor Green
+        }
+    }
+    
+    # Copy configuration files
+    $configFiles = @("tsconfig.json", "tailwind.config.ts", "vite.config.ts", "drizzle.config.ts", "components.json")
+    foreach ($file in $configFiles) {
+        if (Test-Path $file) {
+            Copy-Item $file "$($packageDir.Name)/" -Force -ErrorAction SilentlyContinue
+            Write-Host "  ✓ Added config: $file" -ForegroundColor Green
+        }
+    }
+    
+    # Create package README
+    $packageReadme = @"
+# 🎣 PhishNet Windows Deployment Package
+
+## 🚀 Super Quick Setup for Windows
+
+### Step 1: Extract Package
+Extract this package to: ``C:\PhishNet\``
+
+### Step 2: Run PowerShell as Administrator
+- Press ``Windows + X``
+- Select "Terminal (Admin)" or "PowerShell (Admin)"
+
+### Step 3: Deploy PhishNet
+``````powershell
+cd C:\PhishNet\phishnet
+.\deploy.ps1
+``````
+
+### Step 4: Start PhishNet
+``````powershell
+.\start.ps1
+``````
+
+### Step 5: Access PhishNet
+- **URL**: http://localhost:3000
+- **Email**: admin@phishnet.local
+- **Password**: admin123
+
+## 🔧 Alternative Methods
+
+### Option 1: Batch Files (No PowerShell needed)
+``````cmd
+deploy.bat
+start.bat
+``````
+
+### Option 2: Docker (If you have Docker Desktop)
+``````bash
+docker compose up -d
+``````
+
+## 🛠️ What Gets Installed
+- Node.js 18+
+- PostgreSQL database
+- Redis cache
+- Git version control
+- Docker Desktop (optional)
+
+## ⚠️ Troubleshooting
+
+### PowerShell Execution Policy Error
+``````powershell
+Set-ExecutionPolicy Bypass -Scope Process -Force
+``````
+
+### Port 3000 Already in Use
+``````powershell
+netstat -ano | findstr :3000
+taskkill /PID <PID_NUMBER> /F
+``````
+
+### Need Administrator Rights
+Right-click PowerShell → "Run as Administrator"
+
+## 📞 Need Help?
+- Check ``WINDOWS-SETUP.md`` for detailed Windows guide
+- Check ``QUICK-FRIEND-SETUP.md`` for quick reference
+- Run ``.\test-deployment.ps1`` to verify everything works
+
+## ✅ Success Indicators
+1. No error messages during deployment
+2. Can access http://localhost:3000
+3. Can login with admin credentials
+4. PhishNet dashboard loads properly
+
+**🎯 Ready to use! This package contains everything needed for PhishNet deployment.**
+"@
+    
+    $packageReadme | Out-File -FilePath "$($packageDir.Name)/README.md" -Encoding UTF8
+    Write-Host "  ✓ Added: README.md" -ForegroundColor Green
+    
+    # Try to create ZIP
+    $zipPath = "$($packageDir.Name).zip"
+    try {
+        if (Test-Path $zipPath) { Remove-Item $zipPath -Force }
+        Compress-Archive -Path "$($packageDir.Name)/*" -DestinationPath $zipPath -CompressionLevel Optimal
+        $zipSize = [math]::Round((Get-Item $zipPath).Length / 1MB, 2)
+        
+        Write-Host ""
+        Write-Host "======================================" -ForegroundColor Green
+        Write-Host "🎉 Friend Package Created Successfully!" -ForegroundColor Green
+        Write-Host "======================================" -ForegroundColor Green
+        Write-Host "📦 Package: $zipPath" -ForegroundColor White
+        Write-Host "📏 Size: $zipSize MB" -ForegroundColor White
+        Write-Host ""
+        Write-Host "📤 To share with friends:" -ForegroundColor Blue
+        Write-Host "   1. Send them the ZIP file: $zipPath" -ForegroundColor White
+        Write-Host "   2. Tell them to extract to C:\PhishNet\" -ForegroundColor White
+        Write-Host "   3. Run PowerShell as Admin: .\deploy.ps1" -ForegroundColor White
+        Write-Host "======================================" -ForegroundColor Green
+        Write-Host ""
+    } catch {
+        Write-Warning "Could not create ZIP automatically. Package folder ready: $($packageDir.Name)"
+        Write-Info "You can manually zip the folder to share with friends"
+    }
+    
+    return $true
+}
+
+# Always create friend package after successful deployment
+Write-Host ""
+Write-Info "🎁 Creating shareable package for friends..."
+Create-FriendPackage | Out-Null
