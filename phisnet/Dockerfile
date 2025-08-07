@@ -85,3 +85,44 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
 # Start application
 ENTRYPOINT ["./docker-entrypoint.sh"]
 CMD ["npm", "start"]
+
+# Development stage for Codespaces
+FROM node:18-alpine AS development
+
+# Set working directory
+WORKDIR /workspaces/PhishNet
+
+# Install development dependencies
+RUN apk add --no-cache \
+    curl \
+    git \
+    postgresql-client \
+    redis \
+    bash \
+    vim
+
+# Install global development tools
+RUN npm install -g nodemon tsx
+
+# Create non-root user for development
+RUN addgroup -g 1001 -S nodejs
+RUN adduser -S devuser -u 1001 -G nodejs
+
+# Copy package files
+COPY package*.json ./
+
+# Install all dependencies (including dev dependencies)
+RUN npm install
+
+# Create necessary directories
+RUN mkdir -p /workspaces/PhishNet/uploads /workspaces/PhishNet/logs && \
+    chown -R devuser:nodejs /workspaces/PhishNet
+
+# Switch to development user
+USER devuser
+
+# Expose development ports
+EXPOSE 3001 5432 6379
+
+# Default command for development
+CMD ["npm", "run", "dev"]

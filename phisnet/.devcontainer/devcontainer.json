@@ -1,0 +1,68 @@
+{
+  "name": "PhishNet Development Environment",
+  "dockerComposeFile": [
+    "../docker-compose.yml",
+    "../docker-compose.dev.yml"
+  ],
+  "service": "app",
+  "workspaceFolder": "/workspaces/PhishNet",
+  
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "20"
+    },
+    "ghcr.io/devcontainers/features/git:1": {},
+    "ghcr.io/devcontainers/features/github-cli:1": {},
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {}
+  },
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-vscode.vscode-typescript-next",
+        "bradlc.vscode-tailwindcss",
+        "ms-vscode.vscode-json",
+        "esbenp.prettier-vscode",
+        "ms-vscode.vscode-eslint",
+        "formulahendry.auto-rename-tag",
+        "ms-vscode.vscode-postgres",
+        "ms-vscode.vscode-docker",
+        "ms-vscode-remote.remote-containers"
+      ],
+      "settings": {
+        "terminal.integrated.defaultProfile.linux": "bash",
+        "typescript.preferences.importModuleSpecifier": "relative",
+        "editor.formatOnSave": true,
+        "editor.codeActionsOnSave": {
+          "source.fixAll.eslint": "explicit"
+        }
+      }
+    }
+  },
+
+  "forwardPorts": [3001, 5432, 6379],
+  "portsAttributes": {
+    "3001": {
+      "label": "PhishNet Application",
+      "onAutoForward": "notify"
+    },
+    "5432": {
+      "label": "PostgreSQL Database",
+      "onAutoForward": "silent"
+    },
+    "6379": {
+      "label": "Redis Cache",
+      "onAutoForward": "silent"
+    }
+  },
+
+  "initializeCommand": "docker-compose -f docker-compose.yml -f docker-compose.dev.yml pull",
+  "postCreateCommand": "chmod +x .devcontainer/setup.sh && ./.devcontainer/setup.sh",
+  "postStartCommand": "npm run dev",
+
+  "remoteUser": "node",
+  
+  "mounts": [
+    "source=${localWorkspaceFolder}/uploads,target=/workspaces/PhishNet/uploads,type=bind,consistency=cached"
+  ]
+}

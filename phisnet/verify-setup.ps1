@@ -1,14 +1,14 @@
 # PhishNet Setup Verification Script for Windows PowerShell
 # Verifies that all components are properly installed and configured
 
-Write-Host "🔍 PhishNet Setup Verification" -ForegroundColor Cyan
+Write-Host "PhishNet Setup Verification" -ForegroundColor Cyan
 Write-Host "================================" -ForegroundColor Cyan
 
 # Color functions
-function Write-Success { param($msg) Write-Host "✅ $msg" -ForegroundColor Green }
-function Write-Error { param($msg) Write-Host "❌ $msg" -ForegroundColor Red }
-function Write-Warning { param($msg) Write-Host "⚠️ $msg" -ForegroundColor Yellow }
-function Write-Info { param($msg) Write-Host "ℹ️ $msg" -ForegroundColor Blue }
+function Write-Success { param($msg) Write-Host "[SUCCESS] $msg" -ForegroundColor Green }
+function Write-Error { param($msg) Write-Host "[ERROR] $msg" -ForegroundColor Red }
+function Write-Warning { param($msg) Write-Host "[WARNING] $msg" -ForegroundColor Yellow }
+function Write-Info { param($msg) Write-Host "[INFO] $msg" -ForegroundColor Blue }
 
 # Track overall status
 $script:Errors = 0
@@ -250,7 +250,7 @@ if (Test-Path ".env") {
 # Final summary
 Write-Host ""
 Write-Host "================================" -ForegroundColor Cyan
-Write-Host "🎯 Verification Summary" -ForegroundColor Cyan
+Write-Host "[SUMMARY] Verification Summary" -ForegroundColor Cyan
 Write-Host "================================" -ForegroundColor Cyan
 
 if ($script:Errors -eq 0 -and $script:Warnings -eq 0) {
