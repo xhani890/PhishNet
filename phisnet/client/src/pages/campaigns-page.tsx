@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import AppLayout from "@/components/layout/app-layout";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Table,
   TableBody,
@@ -30,6 +30,9 @@ import { Plus, ChevronRight, Calendar, Mail, Users, Edit, Trash2, Loader2 } from
 import { formatDistanceToNow } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { useCampaigns } from "@/hooks/useApi";
+import { getBadgeVariant, safeToString } from "@/lib/utils";
+import type { Campaign } from "@shared/types/api";
 
 export default function CampaignsPage() {
   const [isCreating, setIsCreating] = useState(false);
@@ -42,9 +45,7 @@ export default function CampaignsPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
-  const { data: campaigns = [] } = useQuery({
-    queryKey: ['/api/campaigns'],
-  });
+  const { data: campaigns = [], isLoading, error } = useCampaigns();
 
   const deleteMutation = useMutation({
     mutationFn: async (campaignId: number) => {
@@ -87,21 +88,6 @@ export default function CampaignsPage() {
       });
     }
   });
-
-  const getBadgeVariant = (status: string) => {
-    switch (status) {
-      case "Active":
-        return "success";
-      case "Scheduled":
-        return "info";
-      case "Completed":
-        return "secondary";
-      case "Draft":
-        return "outline";
-      default:
-        return "outline";
-    }
-  };
 
   const handleEdit = (campaignId: number) => {
     console.log('Edit button clicked for campaign ID:', campaignId);
@@ -170,20 +156,33 @@ export default function CampaignsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {campaigns && campaigns.length > 0 ? (
-                campaigns.map((campaign) => (
+              {isLoading ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center py-10">
+                    <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
+                    Loading campaigns...
+                  </TableCell>
+                </TableRow>
+              ) : error ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center py-10 text-destructive">
+                    Error loading campaigns: {error.message}
+                  </TableCell>
+                </TableRow>
+              ) : campaigns && campaigns.length > 0 ? (
+                campaigns.map((campaign: Campaign) => (
                   <TableRow key={campaign.id}>
-                    <TableCell className="font-medium">{campaign.name}</TableCell>
+                    <TableCell className="font-medium">{safeToString(campaign.name)}</TableCell>
                     <TableCell>
-                      <Badge variant={getBadgeVariant(campaign.status)}>
-                        {campaign.status}
+                      <Badge variant={getBadgeVariant(safeToString(campaign.status))}>
+                        {safeToString(campaign.status)}
                       </Badge>
                     </TableCell>
-                    <TableCell>{campaign.totalTargets || 0}</TableCell>
-                    <TableCell>{campaign.openRate !== null ? `${campaign.openRate}%` : "-"}</TableCell>
-                    <TableCell>{campaign.clickRate !== null ? `${campaign.clickRate}%` : "-"}</TableCell>
+                    <TableCell>{campaign.targets || 0}</TableCell>
+                    <TableCell>{campaign.targets ? `${Math.round((campaign.opened / campaign.targets) * 100)}%` : "-"}</TableCell>
+                    <TableCell>{campaign.targets ? `${Math.round((campaign.clicked / campaign.targets) * 100)}%` : "-"}</TableCell>
                     <TableCell>
-                      {formatDistanceToNow(new Date(campaign.createdAt), { addSuffix: true })}
+                      {campaign.created_at ? formatDistanceToNow(new Date(campaign.created_at), { addSuffix: true }) : "-"}
                     </TableCell>
                     <TableCell>
                       <div className="flex space-x-2">

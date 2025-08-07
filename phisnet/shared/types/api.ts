@@ -18,6 +18,44 @@ import type {
   LandingPage
 } from './index';
 
+// Re-export the types for easier importing
+export type {
+  Campaign,
+  Template,
+  User,
+  DashboardStats,
+  DataPoint,
+  Threat,
+  RiskUser,
+  Training,
+  Group,
+  Target,
+  SmtpProfile,
+  LandingPage
+};
+
+// Additional specific types
+export interface Notification {
+  id: number;
+  title: string;
+  message: string;
+  type: string;
+  priority?: string;
+  createdAt: string;
+}
+
+export interface CampaignResult {
+  id: number;
+  sent: boolean;
+  opened: boolean;
+  clicked: boolean;
+  submitted: boolean;
+}
+
+// Alias for backward compatibility
+export type EmailTemplate = Template;
+export type SMTPProfile = SmtpProfile;
+
 // Generic API Response wrapper
 export interface ApiResponse<T> {
   data?: T;

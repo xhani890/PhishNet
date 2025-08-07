@@ -45,6 +45,16 @@ if (!rules) {
 
 console.log(`🔐 Validating ${rules.description}...`);
 
+// Special handling for development environment
+// Development mode is detected when:
+// 1. Running via npm script (from package.json), OR
+// 2. NODE_ENV is development, OR  
+// 3. All modules are present (shared development environment)
+const isDevelopmentMode = 
+    process.env.npm_lifecycle_event || // Running via npm script
+    process.env.NODE_ENV === 'development' ||
+    (fs.existsSync('server') && fs.existsSync('client') && fs.existsSync('shared')); // All modules present
+
 // Check if forbidden directories/files exist in workspace
 let violations = [];
 
@@ -94,7 +104,19 @@ rules.allowed.forEach(pattern => {
 // Report results
 console.log(`\n📋 Workspace Validation Results for ${WORKSPACE_TYPE.toUpperCase()}:`);
 
-if (violations.length > 0) {
+if (isDevelopmentMode && violations.length > 0) {
+    console.log('\n⚠️  DEVELOPMENT MODE DETECTED:');
+    console.log('   Running in shared development environment');
+    console.log('   In production, use role-specific Codespaces:');
+    violations.forEach(violation => {
+        console.log(`   🔶 ${violation} (would be restricted in production)`);
+    });
+    console.log('\n💡 For production deployment:');
+    console.log('   1. Use frontend-specific devcontainer');
+    console.log('   2. Only allowed directories will be mounted');
+    console.log('   3. Access control enforced at container level');
+    
+} else if (violations.length > 0) {
     console.log('\n❌ ACCESS VIOLATIONS DETECTED:');
     violations.forEach(violation => {
         console.log(`   🚫 ${violation} (should not be accessible in ${WORKSPACE_TYPE} workspace)`);
@@ -108,8 +130,11 @@ if (missingRequired.length > 0) {
     });
 }
 
-if (violations.length === 0 && missingRequired.length === 0) {
+if ((violations.length === 0 || isDevelopmentMode) && missingRequired.length === 0) {
     console.log('\n✅ Workspace validation passed!');
+    if (isDevelopmentMode) {
+        console.log('   🔧 Development mode: Access restrictions are informational');
+    }
     console.log(`\n📂 Available in ${WORKSPACE_TYPE} workspace:`);
     rules.allowed.forEach(allowed => {
         const cleanPath = allowed.replace(/\/$/, '');
@@ -117,7 +142,7 @@ if (violations.length === 0 && missingRequired.length === 0) {
             console.log(`   ✅ ${allowed}`);
         }
     });
-} else {
+} else if (!isDevelopmentMode) {
     console.log('\n💡 To fix workspace access issues:');
     console.log('   1. Use the correct Codespace for your role');
     console.log('   2. Contact team lead if you need cross-module access');

@@ -11,35 +11,17 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { useLocation } from "wouter";
 import { formatDistanceToNow } from "date-fns";
-
-interface Campaign {
-  id: number;
-  name: string;
-  status: "Active" | "Completed" | "Scheduled" | "Draft";
-  openRate: number | null;
-  clickRate: number | null;
-  createdAt: string;
-}
+import { Loader2 } from "lucide-react";
+import type { Campaign } from "@shared/types/api";
+import { getBadgeVariant, safeToString } from "@/lib/utils";
 
 interface RecentCampaignsProps {
   campaigns?: Campaign[];
+  isLoading?: boolean;
 }
 
-export default function RecentCampaigns({ campaigns }: RecentCampaignsProps) {
+export default function RecentCampaigns({ campaigns, isLoading }: RecentCampaignsProps) {
   const [, navigate] = useLocation();
-
-  const getBadgeVariant = (status: string) => {
-    switch (status) {
-      case "Active":
-        return "success";
-      case "Scheduled":
-        return "info";
-      case "Completed":
-        return "secondary";
-      default:
-        return "outline";
-    }
-  };
 
   return (
     <Card>
@@ -66,19 +48,26 @@ export default function RecentCampaigns({ campaigns }: RecentCampaignsProps) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {campaigns && campaigns.length > 0 ? (
-                campaigns.map((campaign) => (
+              {isLoading ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center py-10">
+                    <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
+                    Loading campaigns...
+                  </TableCell>
+                </TableRow>
+              ) : campaigns && campaigns.length > 0 ? (
+                campaigns.slice(0, 5).map((campaign) => (
                   <TableRow key={campaign.id}>
-                    <TableCell className="font-medium">{campaign.name}</TableCell>
+                    <TableCell className="font-medium">{safeToString(campaign.name)}</TableCell>
                     <TableCell>
-                      <Badge variant={getBadgeVariant(campaign.status)}>
-                        {campaign.status}
+                      <Badge variant={getBadgeVariant(safeToString(campaign.status))}>
+                        {safeToString(campaign.status)}
                       </Badge>
                     </TableCell>
-                    <TableCell>{campaign.openRate !== null ? `${campaign.openRate}%` : "-"}</TableCell>
-                    <TableCell>{campaign.clickRate !== null ? `${campaign.clickRate}%` : "-"}</TableCell>
+                    <TableCell>{campaign.targets ? `${Math.round((campaign.opened / campaign.targets) * 100)}%` : "-"}</TableCell>
+                    <TableCell>{campaign.targets ? `${Math.round((campaign.clicked / campaign.targets) * 100)}%` : "-"}</TableCell>
                     <TableCell>
-                      {formatDistanceToNow(new Date(campaign.createdAt), { addSuffix: true })}
+                      {campaign.created_at ? formatDistanceToNow(new Date(campaign.created_at), { addSuffix: true }) : "-"}
                     </TableCell>
                   </TableRow>
                 ))

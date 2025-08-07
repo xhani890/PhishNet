@@ -6,7 +6,11 @@ import ThreatLandscape from "@/components/dashboard/threat-landscape";
 import AtRiskUsers from "@/components/dashboard/at-risk-users";
 import SecurityTraining from "@/components/dashboard/security-training";
 import { useAuth } from "@/hooks/use-auth";
-import { useQuery } from "@tanstack/react-query";
+import { 
+  useDashboardStats, 
+  useCampaigns,
+  useNotifications
+} from "@/hooks/useApi";
 import { 
   Activity, 
   ChartLine, 
@@ -17,23 +21,15 @@ import {
   Info, 
   CheckCircle 
 } from "lucide-react";
-import { apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { formatDistanceToNow } from "date-fns";
+import type { Notification } from "@shared/types/api";
 
 function RecentNotifications() {
-  const { data: notificationData } = useQuery({
-    queryKey: ['/api/notifications'],
-    queryFn: async () => {
-      const response = await apiRequest('GET', '/api/notifications?limit=5');
-      return await response.json();
-    },
-  });
+  const { data: notifications = [], isLoading } = useNotifications();
 
-  const notifications = notificationData?.notifications || [];
-
-  const getIconForType = (type: string, priority: string) => {
+  const getIconForType = (type: string, priority?: string) => {
     if (priority === 'urgent' || priority === 'high') {
       return <AlertTriangle className="h-4 w-4 text-red-500" />;
     }
@@ -46,6 +42,24 @@ function RecentNotifications() {
       default: return <Bell className="h-4 w-4 text-blue-500" />;
     }
   };
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Bell className="h-4 w-4" />
+            Recent Notifications
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground text-center py-4">
+            Loading notifications...
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card>
@@ -62,7 +76,7 @@ function RecentNotifications() {
           </p>
         ) : (
           <div className="space-y-3">
-            {notifications.map((notification: any) => (
+            {notifications.slice(0, 5).map((notification: Notification) => (
               <div key={notification.id} className="flex items-start gap-3">
                 {getIconForType(notification.type, notification.priority)}
                 <div className="flex-1 min-w-0">
@@ -89,29 +103,8 @@ function RecentNotifications() {
 export default function DashboardPage() {
   const { user } = useAuth();
   
-  const { data: dashboardStats } = useQuery({
-    queryKey: ['/api/dashboard/stats'],
-  });
-
-  const { data: campaignsData } = useQuery({
-    queryKey: ['/api/campaigns/recent'],
-  });
-
-  const { data: phishingMetrics } = useQuery({
-    queryKey: ['/api/dashboard/metrics'],
-  });
-
-  const { data: threatData } = useQuery({
-    queryKey: ['/api/dashboard/threats'],
-  });
-
-  const { data: riskUsers } = useQuery({
-    queryKey: ['/api/dashboard/risk-users'],
-  });
-
-  const { data: trainingData } = useQuery({
-    queryKey: ['/api/dashboard/training'],
-  });
+  const { data: dashboardStats, isLoading: statsLoading } = useDashboardStats();
+  const { data: campaigns, isLoading: campaignsLoading } = useCampaigns();
 
   return (
     <AppLayout>
@@ -154,15 +147,18 @@ export default function DashboardPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
         <div className="lg:col-span-2">
-          <RecentCampaigns campaigns={campaignsData} />
+          <RecentCampaigns 
+            campaigns={campaigns || []} 
+            isLoading={campaignsLoading}
+          />
         </div>
-        <PhishingMetricsChart data={phishingMetrics} />
+        <PhishingMetricsChart data={dashboardStats} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <ThreatLandscape threats={threatData} />
-        <AtRiskUsers users={riskUsers} />
-        <SecurityTraining trainings={trainingData} />
+        <ThreatLandscape threats={[]} />
+        <AtRiskUsers users={[]} />
+        <SecurityTraining trainings={[]} />
       </div>
 
       <div className="mt-6">

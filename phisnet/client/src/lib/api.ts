@@ -19,7 +19,8 @@ import type {
   TrainingsResponse,
   ReportsResponse,
   CampaignResultsResponse,
-  CampaignWithDetails
+  CampaignWithDetails,
+  Notification
 } from '@shared/types/api';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001';
@@ -109,6 +110,11 @@ class ApiClient {
   // Reports API
   async getReports(): Promise<ReportsResponse> {
     return this.fetch<ReportsResponse>('/api/reports');
+  }
+
+  // Notifications API
+  async getNotifications(): Promise<Notification[]> {
+    return this.fetch<Notification[]>('/api/notifications');
   }
 }
 
