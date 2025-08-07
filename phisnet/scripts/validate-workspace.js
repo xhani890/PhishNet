@@ -20,8 +20,8 @@ if (!WORKSPACE_TYPE) {
 // Define access rules for each workspace type
 const ACCESS_RULES = {
     frontend: {
-        allowed: ['client/', 'shared/types/', 'docs/frontend/', 'package.json'],
-        forbidden: ['server/', 'migrations/', '.env*', 'shared/schema.ts'],
+        allowed: ['client/', 'shared/types/', 'docs/frontend/', 'scripts/frontend-mock-server.js', 'vite.config.ts', '.env.frontend', 'package.json'],
+        forbidden: ['server/', 'migrations/', '.env', '.env.codespace', '.env.codespaces', '.env.docker', '.env.example', 'shared/schema.ts'],
         description: 'Frontend Developer Workspace'
     },
     backend: {
