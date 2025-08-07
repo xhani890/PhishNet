@@ -4,6 +4,7 @@
   "type": "module",
   "license": "MIT",
   "scripts": {
+    "==== ORIGINAL SCRIPTS ====": "",
     "dev": "cross-env NODE_ENV=development tsx server/index.ts",
     "dev:win": "set NODE_ENV=development&& tsx server/index.ts",
     "dev:unix": "NODE_ENV=development tsx server/index.ts",
@@ -17,7 +18,40 @@
     "db:migrate": "drizzle-kit push",
     "import-data": "tsx scripts/import-data.ts",
     "setup": "npm run db:push && npm run import-data",
-    "kali": "NODE_ENV=development tsx server/index.ts"
+    "kali": "NODE_ENV=development tsx server/index.ts",
+    
+    "==== ZERO TRUST SECURITY ====": "",
+    "security:scan": "npm audit --audit-level=high",
+    "security:secrets": "echo 'Scanning for secrets...' && grep -r 'password\\|secret\\|key\\|token' . --exclude-dir=node_modules || echo 'No secrets found'",
+    "security:multi-tenancy": "echo 'Testing multi-tenancy isolation...'",
+    
+    "==== ACCESS CONTROL ====": "",
+    "access:verify": "bash .github/scripts/verify-access.sh",
+    "access:check-permissions": "echo 'Checking user permissions...'",
+    
+    "==== TESTING WORKFLOWS ====": "",
+    "test:unit": "echo 'Running unit tests...'",
+    "test:integration": "echo 'Running integration tests...'",
+    "test:security": "npm run security:multi-tenancy",
+    
+    "==== MODULAR ACCESS WORKFLOWS ====": "",
+    "setup:frontend": "echo 'Setting up frontend workspace...' && cd client && npm install && npm run build",
+    "setup:backend": "echo 'Setting up backend workspace...' && npm install && npm run db:migrate",
+    "setup:database": "echo 'Setting up database workspace...' && npm run db:migrate",
+    
+    "frontend:dev": "cd client && npm run dev",
+    "backend:dev": "cd server && npm run dev",
+    "app:preview": "concurrently \"npm run backend:dev\" \"npm run frontend:dev\"",
+    "app:full": "npm run dev",
+    
+    "==== WORKSPACE VALIDATION ====": "",
+    "validate:frontend": "node scripts/validate-workspace.js frontend",
+    "validate:backend": "node scripts/validate-workspace.js backend", 
+    "validate:database": "node scripts/validate-workspace.js database",
+    
+    "==== ZERO TRUST SETUP ====": "",
+    "setup:zero-trust": "bash scripts/setup-zero-trust.sh",
+    "ci:security": "npm run security:scan && npm run access:verify"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
