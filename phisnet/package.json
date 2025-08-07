@@ -44,6 +44,8 @@
     "frontend:preview": "vite preview --host 0.0.0.0 --port 4173",
     "frontend:mock": "node scripts/frontend-mock-server.js",
     "frontend:full": "concurrently \"npm run frontend:mock\" \"npm run frontend:dev\"",
+    "frontend:check": "tsc --noEmit",
+    "frontend:check:watch": "tsc --noEmit --watch",
     "backend:dev": "cross-env NODE_ENV=development tsx server/index.ts",
     "app:preview": "concurrently \"npm run backend:dev\" \"npm run frontend:dev\"",
     "app:full": "npm run dev",

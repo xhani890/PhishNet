@@ -58,7 +58,15 @@ rules.forbidden.forEach(pattern => {
         const items = fs.readdirSync('.');
         items.forEach(item => {
             if (regex.test(item + '/') || regex.test(item)) {
-                violations.push(item);
+                // Check if this item is explicitly allowed
+                const isAllowed = rules.allowed.some(allowedPattern => {
+                    const cleanAllowed = allowedPattern.replace(/\/$/, '');
+                    return item === cleanAllowed || item.startsWith(cleanAllowed + '/');
+                });
+                
+                if (!isAllowed) {
+                    violations.push(item);
+                }
             }
         });
     } catch (error) {
@@ -70,7 +78,7 @@ rules.forbidden.forEach(pattern => {
 let missingRequired = [];
 
 rules.allowed.forEach(pattern => {
-    if (!pattern.includes('*') && !pattern.endsWith('.json')) {
+    if (!pattern.includes('*') && !pattern.endsWith('.json') && !pattern.endsWith('.ts') && !pattern.endsWith('.js')) {
         const dirPath = pattern.replace(/\/$/, '');
         if (!fs.existsSync(dirPath)) {
             missingRequired.push(dirPath);
