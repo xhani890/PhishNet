@@ -417,3 +417,43 @@ export const insertCampaignResultSchema = createInsertSchema(campaignResults).pi
   submittedAt: true,
   submittedData: true,
 });
+
+// Password reset schemas
+export const forgotPasswordSchema = z.object({
+  email: z.string().email("Invalid email address"),
+});
+
+export const resetPasswordSchema = z.object({
+  token: z.string().min(1, "Token is required"),
+  password: z.string().min(8, "Password must be at least 8 characters"),
+});
+
+// Default roles configuration
+export const DEFAULT_ROLES = [
+  {
+    name: "Admin",
+    description: "Full system access and user management",
+    permissions: ["all"]
+  },
+  {
+    name: "Manager", 
+    description: "Campaign management and reporting",
+    permissions: ["campaigns", "reports", "users:read"]
+  },
+  {
+    name: "User",
+    description: "Basic user access",
+    permissions: ["campaigns:read", "reports:read"]
+  }
+];
+
+// Export all types
+export type Organization = typeof organizations.$inferSelect;
+export type User = typeof users.$inferSelect;
+export type Group = typeof groups.$inferSelect;
+export type Target = typeof targets.$inferSelect;
+export type SmtpProfile = typeof smtpProfiles.$inferSelect;
+export type EmailTemplate = typeof emailTemplates.$inferSelect;
+export type LandingPage = typeof landingPages.$inferSelect;
+export type Campaign = typeof campaigns.$inferSelect;
+export type CampaignResult = typeof campaignResults.$inferSelect;

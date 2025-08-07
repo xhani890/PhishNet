@@ -1,5 +1,6 @@
 // Create: phisnet/scripts/setup-roles.ts
 import { db } from "../server/db";
+import { eq } from "drizzle-orm";
 import { rolesSchema, userRolesSchema, DEFAULT_ROLES } from "../shared/schema";
 
 export async function setupDefaultRoles() {
