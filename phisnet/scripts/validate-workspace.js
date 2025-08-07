@@ -48,29 +48,34 @@ console.log(`🔐 Validating ${rules.description}...`);
 // Check if forbidden directories/files exist in workspace
 let violations = [];
 
-rules.forbidden.forEach(pattern => {
-    // Convert glob pattern to regex for simple matching
-    const regexPattern = pattern.replace(/\*/g, '.*').replace(/\//g, '\\/');
-    const regex = new RegExp(`^${regexPattern}`);
+// Get all items in current directory
+const allItems = fs.readdirSync('.');
+
+allItems.forEach(item => {
+    // Check if this item is forbidden
+    const isForbidden = rules.forbidden.some(pattern => {
+        if (pattern.includes('*')) {
+            // Handle wildcard patterns like '.env*'
+            const regexPattern = pattern.replace(/\*/g, '.*');
+            const regex = new RegExp(`^${regexPattern}$`);
+            return regex.test(item);
+        } else {
+            // Handle exact matches or directory patterns
+            const cleanPattern = pattern.replace(/\/$/, '');
+            return item === cleanPattern || item.startsWith(cleanPattern + '/');
+        }
+    });
     
-    // Check current directory contents
-    try {
-        const items = fs.readdirSync('.');
-        items.forEach(item => {
-            if (regex.test(item + '/') || regex.test(item)) {
-                // Check if this item is explicitly allowed
-                const isAllowed = rules.allowed.some(allowedPattern => {
-                    const cleanAllowed = allowedPattern.replace(/\/$/, '');
-                    return item === cleanAllowed || item.startsWith(cleanAllowed + '/');
-                });
-                
-                if (!isAllowed) {
-                    violations.push(item);
-                }
-            }
+    // If item is forbidden, check if it's explicitly allowed
+    if (isForbidden) {
+        const isExplicitlyAllowed = rules.allowed.some(allowedPattern => {
+            const cleanAllowed = allowedPattern.replace(/\/$/, '');
+            return item === cleanAllowed || item.startsWith(cleanAllowed + '/');
         });
-    } catch (error) {
-        // Directory doesn't exist, which is fine
+        
+        if (!isExplicitlyAllowed) {
+            violations.push(item);
+        }
     }
 });
 
@@ -78,7 +83,7 @@ rules.forbidden.forEach(pattern => {
 let missingRequired = [];
 
 rules.allowed.forEach(pattern => {
-    if (!pattern.includes('*') && !pattern.endsWith('.json') && !pattern.endsWith('.ts') && !pattern.endsWith('.js')) {
+    if (pattern.endsWith('/') && !pattern.includes('*')) {
         const dirPath = pattern.replace(/\/$/, '');
         if (!fs.existsSync(dirPath)) {
             missingRequired.push(dirPath);

@@ -98,6 +98,34 @@ app.get('/api/campaigns', (req, res) => {
   res.json({ campaigns: mockCampaigns });
 });
 
+// Individual campaign with detailed information
+app.get('/api/campaigns/:id', (req, res) => {
+  const campaign = {
+    ...mockCampaigns[0],
+    id: parseInt(req.params.id),
+    scheduledAt: "2024-01-01T09:00:00Z",
+    createdAt: "2024-01-01T00:00:00Z",
+    endDate: "2024-01-15T17:00:00Z",
+    targetGroup: "Marketing Team",
+    totalTargets: 25,
+    emailTemplate: { name: "Corporate Login" },
+    landingPage: { name: "Login Page" },
+    smtpProfile: { name: "Primary SMTP" },
+    createdBy: "Admin User"
+  };
+  res.json(campaign);
+});
+
+// Campaign results
+app.get('/api/campaigns/:id/results', (req, res) => {
+  const mockResults = [
+    { id: 1, campaignId: parseInt(req.params.id), targetId: 1, sent: true, opened: true, clicked: false, submitted: false, timestamp: "2024-01-01T10:00:00Z" },
+    { id: 2, campaignId: parseInt(req.params.id), targetId: 2, sent: true, opened: false, clicked: false, submitted: false, timestamp: "2024-01-01T10:01:00Z" },
+    { id: 3, campaignId: parseInt(req.params.id), targetId: 3, sent: true, opened: true, clicked: true, submitted: true, timestamp: "2024-01-01T10:02:00Z" }
+  ];
+  res.json(mockResults);
+});
+
 app.get('/api/templates', (req, res) => {
   res.json({ templates: mockTemplates });
 });
