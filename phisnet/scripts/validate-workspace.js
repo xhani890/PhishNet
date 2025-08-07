@@ -5,9 +5,9 @@
  * Ensures developers only access files within their assigned modules
  */
 
-const fs = require('fs');
-const path = require('path');
-const process = require('process');
+import fs from 'fs';
+import path from 'path';
+import process from 'process';
 
 const WORKSPACE_TYPE = process.env.WORKSPACE_TYPE || process.argv[2];
 
