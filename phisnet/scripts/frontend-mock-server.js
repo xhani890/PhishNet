@@ -42,6 +42,57 @@ const mockTemplates = [
   }
 ];
 
+// Additional mock data for dashboard components
+const mockPhishingMetrics = [
+  { date: '2024-01-01', opens: 45, clicks: 12, submissions: 3 },
+  { date: '2024-01-02', opens: 52, clicks: 18, submissions: 5 },
+  { date: '2024-01-03', opens: 38, clicks: 9, submissions: 2 },
+  { date: '2024-01-04', opens: 61, clicks: 23, submissions: 7 },
+  { date: '2024-01-05', opens: 49, clicks: 15, submissions: 4 }
+];
+
+const mockThreats = [
+  { id: 1, type: 'Phishing', level: 'High', count: 12, trend: 'up' },
+  { id: 2, type: 'Malware', level: 'Medium', count: 8, trend: 'down' },
+  { id: 3, type: 'Social Engineering', level: 'High', count: 15, trend: 'up' }
+];
+
+const mockRiskUsers = [
+  { id: 1, name: 'John Doe', email: 'john@example.com', riskScore: 85, incidents: 3 },
+  { id: 2, name: 'Jane Smith', email: 'jane@example.com', riskScore: 72, incidents: 2 }
+];
+
+const mockTrainings = [
+  { id: 1, title: 'Phishing Awareness', completion: 78, required: true },
+  { id: 2, title: 'Password Security', completion: 92, required: true },
+  { id: 3, title: 'Data Protection', completion: 65, required: false }
+];
+
+const mockGroups = [
+  { id: 1, name: 'Marketing Team', targetCount: 25, lastUpdated: '2024-01-01' },
+  { id: 2, name: 'Sales Team', targetCount: 18, lastUpdated: '2024-01-02' }
+];
+
+const mockTargets = [
+  { id: 1, firstName: 'Alice', lastName: 'Johnson', email: 'alice@example.com', position: 'Manager' },
+  { id: 2, firstName: 'Bob', lastName: 'Wilson', email: 'bob@example.com', position: 'Developer' }
+];
+
+const mockUsers = [
+  { id: 1, firstName: 'Admin', lastName: 'User', email: 'admin@example.com', roles: ['Admin'] },
+  { id: 2, firstName: 'Regular', lastName: 'User', email: 'user@example.com', roles: ['User'] }
+];
+
+const mockProfiles = [
+  { id: 1, name: 'Primary SMTP', host: 'smtp.example.com', port: 587, isDefault: true },
+  { id: 2, name: 'Backup SMTP', host: 'backup.example.com', port: 587, isDefault: false }
+];
+
+const mockLandingPages = [
+  { id: 1, name: 'Login Page', pageType: 'login', url: '/landing/login', isActive: true },
+  { id: 2, name: 'Survey Page', pageType: 'survey', url: '/landing/survey', isActive: true }
+];
+
 // Mock API Routes
 app.get('/api/campaigns', (req, res) => {
   res.json({ campaigns: mockCampaigns });
@@ -51,12 +102,82 @@ app.get('/api/templates', (req, res) => {
   res.json({ templates: mockTemplates });
 });
 
+// Dashboard data endpoints
+app.get('/api/dashboard/phishing-metrics', (req, res) => {
+  res.json(mockPhishingMetrics);
+});
+
+app.get('/api/dashboard/threats', (req, res) => {
+  res.json(mockThreats);
+});
+
+app.get('/api/dashboard/risk-users', (req, res) => {
+  res.json(mockRiskUsers);
+});
+
+app.get('/api/dashboard/trainings', (req, res) => {
+  res.json(mockTrainings);
+});
+
+// Groups and targets
+app.get('/api/groups', (req, res) => {
+  res.json(mockGroups);
+});
+
+app.get('/api/targets', (req, res) => {
+  res.json(mockTargets);
+});
+
+// Users
+app.get('/api/users', (req, res) => {
+  res.json(mockUsers);
+});
+
+app.get('/api/roles', (req, res) => {
+  res.json([
+    { id: 1, name: 'Admin' },
+    { id: 2, name: 'User' },
+    { id: 3, name: 'Viewer' }
+  ]);
+});
+
+// SMTP Profiles
+app.get('/api/smtp-profiles', (req, res) => {
+  res.json(mockProfiles);
+});
+
+// Landing Pages
+app.get('/api/landing-pages', (req, res) => {
+  res.json(mockLandingPages);
+});
+
+// Reports
+app.get('/api/reports', (req, res) => {
+  res.json({
+    campaigns: mockCampaigns,
+    users: mockUsers,
+    summary: {
+      totalEmails: 150,
+      delivered: 142,
+      opened: 89,
+      clicked: 23,
+      reported: 5
+    }
+  });
+});
+
 app.get('/api/dashboard/stats', (req, res) => {
   res.json({
     totalCampaigns: 5,
     activeCampaigns: 2,
+    campaignChange: 15,
     totalTargets: 250,
-    successRate: 15.2
+    successRate: 15.2,
+    successRateChange: 2.1,
+    totalUsers: 45,
+    newUsers: 8,
+    trainingCompletion: 78.5,
+    trainingCompletionChange: 5.2
   });
 });
 

@@ -39,8 +39,14 @@ export interface User {
 export interface DashboardStats {
   totalCampaigns: number;
   activeCampaigns: number;
+  campaignChange: number;
   totalTargets: number;
   successRate: number;
+  successRateChange: number;
+  totalUsers: number;
+  newUsers: number;
+  trainingCompletion: number;
+  trainingCompletionChange: number;
 }
 
 // API Response Types
@@ -64,4 +70,71 @@ export interface FrontendConfig {
   version: string;
   devMode: boolean;
   mockData: boolean;
+}
+
+// Additional interfaces for dashboard components
+export interface DataPoint {
+  date: string;
+  opens: number;
+  clicks: number;
+  submissions: number;
+}
+
+export interface Threat {
+  id: number;
+  type: string;
+  level: 'Low' | 'Medium' | 'High';
+  count: number;
+  trend: 'up' | 'down' | 'stable';
+}
+
+export interface RiskUser {
+  id: number;
+  name: string;
+  email: string;
+  riskScore: number;
+  incidents: number;
+}
+
+export interface Training {
+  id: number;
+  title: string;
+  completion: number;
+  required: boolean;
+}
+
+// Enhanced interfaces to match frontend expectations
+export interface Group {
+  id: number;
+  name: string;
+  targetCount: number;
+  lastUpdated: string;
+}
+
+export interface Target {
+  id: number;
+  firstName: string;
+  lastName: string;
+  email: string;
+  position: string;
+}
+
+export interface UserWithRoles extends User {
+  roles?: Array<{ id: number; name: string }>;
+}
+
+export interface SmtpProfile {
+  id: number;
+  name: string;
+  host: string;
+  port: number;
+  isDefault: boolean;
+}
+
+export interface LandingPage {
+  id: number;
+  name: string;
+  pageType: string;
+  url: string;
+  isActive: boolean;
 }

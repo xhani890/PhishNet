@@ -447,13 +447,4 @@ export const DEFAULT_ROLES = [
   }
 ];
 
-// Export all types
-export type Organization = typeof organizations.$inferSelect;
-export type User = typeof users.$inferSelect;
-export type Group = typeof groups.$inferSelect;
-export type Target = typeof targets.$inferSelect;
-export type SmtpProfile = typeof smtpProfiles.$inferSelect;
-export type EmailTemplate = typeof emailTemplates.$inferSelect;
-export type LandingPage = typeof landingPages.$inferSelect;
-export type Campaign = typeof campaigns.$inferSelect;
-export type CampaignResult = typeof campaignResults.$inferSelect;
+// END OF FILE - Types already exported above
