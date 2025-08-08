@@ -55,7 +55,7 @@ jobs:
         npx tsc --noEmit || echo "TypeScript check completed"
         
     - name: Upload ESLint results
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: eslint-report
         path: phisnet/eslint-report.json
@@ -93,7 +93,7 @@ jobs:
         args: --project-name=phishnet --severity-threshold=medium
         
     - name: Upload security scan results
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: security-reports
         path: |
@@ -139,7 +139,7 @@ jobs:
         find . -type f -size +1M ! -path "./node_modules/*" ! -path "./.git/*" -exec ls -lh {} + | head -20 >> bundle-analysis.md || true
         
     - name: Upload performance analysis
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: performance-analysis
         path: phisnet/bundle-analysis.md
@@ -182,7 +182,7 @@ jobs:
         npm audit --json >> dependency-report.md || true
         
     - name: Upload dependency analysis
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: dependency-analysis
         path: |
