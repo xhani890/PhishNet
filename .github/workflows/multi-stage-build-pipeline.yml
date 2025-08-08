@@ -29,18 +29,14 @@ jobs:
         working-directory: ./phisnet
         run: |
           npm ci
-          if [ -d "client" ] && [ -f "client/package.json" ]; then
-            cd client && npm ci && cd ..
-          fi
-          if [ -d "server" ] && [ -f "server/package.json" ]; then
-            cd server && npm ci && cd ..
-          fi
           
       - name: Build stage 1
         id: build
+        working-directory: ./phisnet
         run: |
-          echo "🏗️ Building client application"
-          cd client && npm run build
+          echo "🏗️ Building client application (Stage 1)"
+          # Run the main build which includes client build via Vite
+          npm run build
           echo "success=true" >> $GITHUB_OUTPUT
 
   build-stage-2:
@@ -51,14 +47,35 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         
-      - name: Build stage 2
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: './phisnet/package.json'
+          
+      - name: Install dependencies
+        working-directory: ./phisnet
         run: |
-          echo "🏗️ Building server application"
-          cd server && npm run build
+          npm ci
+        
+      - name: Build stage 2
+        working-directory: ./phisnet
+        run: |
+          echo "🏗️ Building server application (Stage 2)"
+          # Verify the main build already completed both client and server
+          if [ -d "dist" ]; then
+            echo "✅ Build artifacts found in dist/ directory"
+            ls -la dist/
+          else
+            echo "❌ No build artifacts found, running build again"
+            npm run build
+          fi
           
       - name: Create build summary
         run: |
           echo "## 🏗️ Multi-Stage Build Report" >> $GITHUB_STEP_SUMMARY
-          echo "- **Stage 1**: ✅ Client Build PASSED" >> $GITHUB_STEP_SUMMARY
-          echo "- **Stage 2**: ✅ Server Build PASSED" >> $GITHUB_STEP_SUMMARY
+          echo "- **Stage 1**: ✅ Client & Server Build PASSED" >> $GITHUB_STEP_SUMMARY
+          echo "- **Stage 2**: ✅ Build Verification PASSED" >> $GITHUB_STEP_SUMMARY
           echo "- **Status**: ✅ PIPELINE COMPLETED" >> $GITHUB_STEP_SUMMARY
+          echo "- **Build Method**: Monorepo build (Vite + esbuild)" >> $GITHUB_STEP_SUMMARY
