@@ -61,7 +61,7 @@ main (production)
 
 ### **Release Branch** 🚀
 - **Purpose:** Release preparation and version tagging
-- **Pattern:** `release/v*.*.*`
+- **Pattern:** `release` (single branch for release staging)
 - **Protection:** ✅ Basic protection enabled
 - **Deployment:** Manual trigger to production
 - **Triggering Workflows:**
@@ -262,7 +262,7 @@ https://github.com/gh0st-bit/PhishNet/actions
 
 ### **1. Check Branches on GitHub:**
 Visit: `https://github.com/gh0st-bit/PhishNet/branches`
-- Should see: main, develop, staging, release, feature/*, hotfix/*
+- Should see: main, develop, staging, release, feature/sdlc-implementation, hotfix/security-patches (6 total branches)
 
 ### **2. Check GitHub Actions:**
 Visit: `https://github.com/gh0st-bit/PhishNet/actions`
