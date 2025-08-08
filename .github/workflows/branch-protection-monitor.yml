@@ -30,8 +30,10 @@ jobs:
       with:
         node-version: '18'
         cache: 'npm'
+        cache-dependency-path: 'phisnet/package-lock.json'
         
     - name: Install dependencies
+      working-directory: ./phisnet
       run: |
         npm install @octokit/rest js-yaml
         
