@@ -21,8 +21,11 @@ RUN apk add --no-cache \
 # Copy package files (monorepo has single package.json)
 COPY package*.json ./
 
+# Clean install to fix npm optional dependency bug with @rollup/rollup-linux-x64-musl
+RUN rm -rf node_modules package-lock.json || true
+
 # Install all dependencies (including devDependencies for build)
-RUN npm ci --ignore-scripts
+RUN npm install
 
 # Copy source code
 COPY . .

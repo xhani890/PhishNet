@@ -30,6 +30,12 @@ jobs:
         run: |
           npm ci
           
+      - name: Clean dependency install for build
+        working-directory: ./phisnet
+        run: |
+          rm -rf node_modules package-lock.json || true
+          npm install
+          
       - name: Build stage 1
         id: build
         working-directory: ./phisnet
@@ -58,6 +64,12 @@ jobs:
         working-directory: ./phisnet
         run: |
           npm ci
+        
+      - name: Clean dependency install for build
+        working-directory: ./phisnet
+        run: |
+          rm -rf node_modules package-lock.json || true
+          npm install
         
       - name: Build stage 2
         working-directory: ./phisnet

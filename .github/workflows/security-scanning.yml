@@ -117,6 +117,12 @@ jobs:
       working-directory: ./phisnet
       run: npm ci
       
+    - name: Clean dependency install for build
+      working-directory: ./phisnet
+      run: |
+        rm -rf node_modules package-lock.json || true
+        npm install
+      
     - name: Build application
       working-directory: ./phisnet
       run: npm run build || echo "Build completed with warnings"
