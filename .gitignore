@@ -1,6 +1,6 @@
 # Node & Dependencies
 node_modules/
-package-lock.json
+# package-lock.json (NEEDED for CI/CD workflows)
 yarn.lock
 
 # Build files
