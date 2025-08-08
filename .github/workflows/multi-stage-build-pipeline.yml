@@ -23,11 +23,18 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
+          cache-dependency-path: './phisnet/package.json'
           
       - name: Install dependencies
+        working-directory: ./phisnet
         run: |
-          cd client && npm ci
-          cd ../server && npm ci
+          npm ci
+          if [ -d "client" ] && [ -f "client/package.json" ]; then
+            cd client && npm ci && cd ..
+          fi
+          if [ -d "server" ] && [ -f "server/package.json" ]; then
+            cd server && npm ci && cd ..
+          fi
           
       - name: Build stage 1
         id: build

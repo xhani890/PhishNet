@@ -7,7 +7,7 @@ on:
     branches: [ main, develop ]
 
 env:
-  NODE_VERSION: '20'
+  NODE_VERSION: '18'
   POSTGRES_VERSION: '15'
 
 jobs:
@@ -29,6 +29,7 @@ jobs:
           languages: typescript, javascript
 
       - name: Run Dependency Scan
+        working-directory: ./phisnet
         run: |
           npm audit --audit-level=high
           npx @cyclonedx/cyclonedx-npm --output-format JSON --output-file sbom.json
