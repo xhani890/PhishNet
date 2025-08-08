@@ -37,7 +37,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     outputs:
-      image-tag: ${{ steps.meta.outputs.tags }}
+      image-tag: ${{ steps.tag.outputs.single-tag }}
       image-digest: ${{ steps.build.outputs.digest }}
       version: ${{ steps.version.outputs.version }}
       
@@ -91,6 +91,14 @@ jobs:
         build-args: |
           NODE_VERSION=${{ env.NODE_VERSION }}
           BUILD_VERSION=${{ steps.version.outputs.version }}
+          
+    - name: Extract single tag for testing
+      id: tag
+      run: |
+        # Extract the first tag from metadata output for testing
+        SINGLE_TAG=$(echo "${{ steps.meta.outputs.tags }}" | head -n1)
+        echo "single-tag=$SINGLE_TAG" >> $GITHUB_OUTPUT
+        echo "Using tag for testing: $SINGLE_TAG"
 
   test-deploy:
     runs-on: ubuntu-latest
