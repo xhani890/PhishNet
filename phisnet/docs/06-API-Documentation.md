@@ -849,7 +849,7 @@ Get dashboard analytics data.
 
 #### Query Parameters
 ```
-?timeRange=30d&organizationId=1
+?timeRange=30d&organizationId={organizationId}
 ```
 
 #### Response
