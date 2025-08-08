@@ -20,7 +20,7 @@
     ".env.example",
     "shared/schema.ts"
   ],
-  "validated": "2025-08-07T21:25:45.905Z",
+  "validated": "2025-08-07T21:59:55.200Z",
   "violations": [
     ".env",
     ".env.codespace",
