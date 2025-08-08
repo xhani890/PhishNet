@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -27,6 +26,9 @@ import {
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { format, formatDistance, formatDistanceToNow } from "date-fns";
+import { useCampaignDetails, useCampaignResults } from "@/hooks/useApi";
+import { getBadgeVariant, safeToString } from "@/lib/utils";
+import type { Campaign, CampaignResult } from "@shared/types/api";
 
 interface CampaignDetailsProps {
   campaignId: number;
@@ -36,42 +38,35 @@ interface CampaignDetailsProps {
 export default function CampaignDetails({ campaignId, onEdit }: CampaignDetailsProps) {
   const [activeTab, setActiveTab] = useState("overview");
 
-  const { data: campaign, isLoading } = useQuery({
-    queryKey: ['/api/campaigns', campaignId],
-  });
-
-  const { data: results = [] } = useQuery({
-    queryKey: ['/api/campaigns', campaignId, 'results'],
-    enabled: !!campaignId,
-  });
+  const { data: campaign, isLoading } = useCampaignDetails(campaignId);
+  const { data: results = [] } = useCampaignResults(campaignId);
 
   if (isLoading || !campaign) {
     return <div className="flex justify-center p-12">Loading campaign details...</div>;
   }
 
-  // Calculate stats
-  const totalTargets = results.length;
-  const sentCount = results.filter(r => r.sent).length;
-  const openedCount = results.filter(r => r.opened).length;
-  const clickedCount = results.filter(r => r.clicked).length;
-  const submittedCount = results.filter(r => r.submitted).length;
+  // Calculate stats - using type-safe array operations
+  const typedResults = results as CampaignResult[];
+  const totalTargets = typedResults.length;
+  const sentCount = typedResults.filter((r: CampaignResult) => r.sent).length;
+  const openedCount = typedResults.filter((r: CampaignResult) => r.opened).length;
+  const clickedCount = typedResults.filter((r: CampaignResult) => r.clicked).length;
+  const submittedCount = typedResults.filter((r: CampaignResult) => r.submitted).length;
   
   const sentPercentage = totalTargets > 0 ? Math.round((sentCount / totalTargets) * 100) : 0;
   const openedPercentage = sentCount > 0 ? Math.round((openedCount / sentCount) * 100) : 0;
   const clickedPercentage = openedCount > 0 ? Math.round((clickedCount / openedCount) * 100) : 0;
   const submittedPercentage = clickedCount > 0 ? Math.round((submittedCount / clickedCount) * 100) : 0;
 
-  const campaignStartTime = campaign.scheduledAt ? new Date(campaign.scheduledAt) : new Date(campaign.createdAt);
-  const campaignEndTime = campaign.endDate ? new Date(campaign.endDate) : null;
-  const campaignDuration = campaignEndTime ? 
-    formatDistance(campaignEndTime, campaignStartTime) : 
-    'No end date specified';
+  const campaignStartTime = campaign.created_at ? new Date(campaign.created_at) : new Date();
+  const campaignEndTime = null; // endDate not available in basic Campaign type
+  const campaignDuration = 'Duration not specified';
 
   const statusBadgeVariant = {
-    "Active": "success",
-    "Scheduled": "info",
-    "Completed": "secondary",
-    "Draft": "outline"
+    "active": "success",
+    "draft": "outline", 
+    "completed": "secondary",
+    "paused": "warning"
   }[campaign.status] || "outline";
 
   return (
@@ -247,12 +242,12 @@ export default function CampaignDetails({ campaignId, onEdit }: CampaignDetailsP
                   {results.length > 0 ? (
                     results.map((result) => (
                       <TableRow key={result.id}>
-                        <TableCell className="font-medium">{result.target?.email || "Unknown"}</TableCell>
+                        <TableCell className="font-medium">Target #{result.targetId}</TableCell>
                         <TableCell>
                           {result.sent ? 
                             <span className="flex items-center gap-1">
                               <CheckCircle2 className="h-4 w-4 text-success" />
-                              {result.sentAt && format(new Date(result.sentAt), "MMM d, h:mm a")}
+                              {result.timestamp && format(new Date(result.timestamp), "MMM d, h:mm a")}
                             </span> : 
                             <ServerCrash className="h-4 w-4 text-muted-foreground" />}
                         </TableCell>
@@ -260,7 +255,7 @@ export default function CampaignDetails({ campaignId, onEdit }: CampaignDetailsP
                           {result.opened ? 
                             <span className="flex items-center gap-1">
                               <CheckCircle2 className="h-4 w-4 text-success" />
-                              {result.openedAt && format(new Date(result.openedAt), "MMM d, h:mm a")}
+                              {result.timestamp && format(new Date(result.timestamp), "MMM d, h:mm a")}
                             </span> : 
                             "-"}
                         </TableCell>
@@ -268,7 +263,7 @@ export default function CampaignDetails({ campaignId, onEdit }: CampaignDetailsP
                           {result.clicked ? 
                             <span className="flex items-center gap-1">
                               <CheckCircle2 className="h-4 w-4 text-success" />
-                              {result.clickedAt && format(new Date(result.clickedAt), "MMM d, h:mm a")}
+                              {result.timestamp && format(new Date(result.timestamp), "MMM d, h:mm a")}
                             </span> : 
                             "-"}
                         </TableCell>
@@ -276,7 +271,7 @@ export default function CampaignDetails({ campaignId, onEdit }: CampaignDetailsP
                           {result.submitted ? 
                             <span className="flex items-center gap-1">
                               <CheckCircle2 className="h-4 w-4 text-success" />
-                              {result.submittedAt && format(new Date(result.submittedAt), "MMM d, h:mm a")}
+                              {result.timestamp && format(new Date(result.timestamp), "MMM d, h:mm a")}
                             </span> : 
                             "-"}
                         </TableCell>

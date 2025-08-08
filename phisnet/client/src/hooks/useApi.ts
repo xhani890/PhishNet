@@ -152,6 +152,15 @@ export const useReports = () => {
   });
 };
 
+// Campaign Details Hook
+export const useCampaignDetails = (id: number) => {
+  return useQuery<CampaignWithDetails, Error>({
+    queryKey: ['campaign-details', id],
+    queryFn: () => apiClient.getCampaign(id),
+    enabled: !!id,
+  });
+};
+
 // Notifications Hook
 export const useNotifications = () => {
   return useQuery<Notification[], Error>({
