@@ -42,3 +42,9 @@ vite.config.js
 # Keep uploads directory but ignore contents
 uploads/*
 !uploads/.gitkeep
+
+# AI Assistant tracking and prompt folders (ignore for version control)
+prompts/
+ai-tracking/
+reference-docs/
+agent-workspace/
