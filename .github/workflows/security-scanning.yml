@@ -82,7 +82,7 @@ jobs:
         args: --severity-threshold=medium --json-file-output=snyk-report.json
         
     - name: Upload security reports
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: dependency-security-reports
         path: |
@@ -168,7 +168,7 @@ jobs:
         fi
         
     - name: Upload code security reports
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: code-security-reports
         path: |
@@ -236,7 +236,7 @@ jobs:
         fi
         
     - name: Upload container security reports
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: container-security-reports
         path: |
@@ -250,7 +250,7 @@ jobs:
     
     steps:
     - name: Download all security reports
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       
     - name: OWASP compliance assessment
       run: |
@@ -345,7 +345,7 @@ jobs:
           });
           
     - name: Upload compliance reports
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: compliance-reports
         path: |
