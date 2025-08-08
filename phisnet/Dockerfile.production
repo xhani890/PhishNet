@@ -18,23 +18,16 @@ RUN apk add --no-cache \
     g++ \
     git
 
-# Copy package files
+# Copy package files (monorepo has single package.json)
 COPY package*.json ./
-COPY client/package*.json ./client/
-COPY server/package*.json ./server/
 
-# Install dependencies
-RUN npm ci --production --ignore-scripts
+# Install all dependencies (including devDependencies for build)
+RUN npm ci --ignore-scripts
 
 # Copy source code
 COPY . .
 
-# Build client
-WORKDIR /app/client
-RUN npm run build
-
-# Build server
-WORKDIR /app/server
+# Build application (vite builds client, esbuild builds server)
 RUN npm run build
 
 # Production stage
@@ -53,11 +46,12 @@ RUN apk add --no-cache \
     postgresql-client \
     redis
 
-# Copy built application
+# Copy package files and install only production dependencies
 COPY --from=builder --chown=phishnet:nodejs /app/package*.json ./
-COPY --from=builder --chown=phishnet:nodejs /app/node_modules ./node_modules
-COPY --from=builder --chown=phishnet:nodejs /app/server/dist ./server/dist
-COPY --from=builder --chown=phishnet:nodejs /app/client/dist ./client/dist
+RUN npm ci --production --ignore-scripts && npm cache clean --force
+
+# Copy built application
+COPY --from=builder --chown=phishnet:nodejs /app/dist ./dist
 COPY --from=builder --chown=phishnet:nodejs /app/shared ./shared
 
 # Copy necessary files
