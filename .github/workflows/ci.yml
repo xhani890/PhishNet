@@ -3,8 +3,14 @@ name: 🚀 PhishNet CI Pipeline
 on:
   push:
     branches: [ main, develop ]
+    paths:
+      - 'phisnet/**'
+      - '.github/workflows/ci.yml'
   pull_request:
     branches: [ main ]
+    paths:
+      - 'phisnet/**'
+      - '.github/workflows/ci.yml'
   workflow_dispatch:
 
 env:

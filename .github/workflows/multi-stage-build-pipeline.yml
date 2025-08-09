@@ -1,10 +1,16 @@
 name: 🏗️ Multi-Stage Build Pipeline
 
 on:
-  push:
-    branches: [ main, develop ]
-  pull_request:
-    branches: [ main, develop ]
+  workflow_dispatch:
+    inputs:
+      build_target:
+        description: 'Build target environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+        - staging
+        - production
 
 env:
   NODE_VERSION: '18'
