@@ -29,13 +29,17 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: 'phisnet/package-lock.json'
         
-    - name: Install workflow dependencies
-      run: |
-        npm install @octokit/rest js-yaml
+    - name: Install dependencies from phisnet
+      working-directory: ./phisnet
+      run: npm ci
         
     - name: Setup branch protection
       run: |
+        # Use node_modules from phisnet directory
+        export NODE_PATH="$(pwd)/phisnet/node_modules:$NODE_PATH"
         node .github/scripts/setup-branch-protection.js
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
