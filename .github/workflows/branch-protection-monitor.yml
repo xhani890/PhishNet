@@ -29,11 +29,8 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: '18'
-        cache: 'npm'
-        cache-dependency-path: 'phisnet/package-lock.json'
         
-    - name: Install dependencies
-      working-directory: ./phisnet
+    - name: Install workflow dependencies
       run: |
         npm install @octokit/rest js-yaml
         
