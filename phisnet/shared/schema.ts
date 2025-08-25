@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, jsonb, varchar, foreignKey } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, jsonb, varchar } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -25,6 +25,8 @@ export const users = pgTable("users", {
   lastFailedLogin: timestamp("last_failed_login"),
   accountLocked: boolean("account_locked").default(false).notNull(),
   accountLockedUntil: timestamp("account_locked_until"),
+  // Active status column (added via migration add_is_active_to_users.sql)
+  isActive: boolean("is_active").default(true).notNull(),
   isAdmin: boolean("is_admin").default(false).notNull(),
   organizationId: integer("organization_id").references(() => organizations.id, { onDelete: 'cascade' }).notNull(),
   organizationName: text("organization_name").notNull().default("None"),
@@ -108,6 +110,8 @@ export const landingPages = pgTable("landing_pages", {
   redirectUrl: text("redirect_url"),
   pageType: text("page_type").default("basic"),
   thumbnail: text("thumbnail"),
+  captureData: boolean("capture_data").default(true),
+  capturePasswords: boolean("capture_passwords").default(false),
   organizationId: integer("organization_id").references(() => organizations.id, { onDelete: "cascade" }).notNull(),
   createdById: integer("created_by_id").references(() => users.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -136,6 +140,7 @@ export const campaignResults = pgTable("campaign_results", {
   id: serial("id").primaryKey(),
   campaignId: integer("campaign_id").references(() => campaigns.id, { onDelete: 'cascade' }).notNull(),
   targetId: integer("target_id").references(() => targets.id, { onDelete: 'cascade' }).notNull(),
+  organizationId: integer("organization_id").references(() => organizations.id, { onDelete: 'cascade' }).notNull(),
   status: text("status").notNull().default("pending"), // pending, sent, opened, clicked, submitted
   sent: boolean("sent").default(false),
   sentAt: timestamp("sent_at"),
@@ -349,12 +354,13 @@ export const insertGroupSchema = createInsertSchema(groups).pick({
   description: true,
 });
 
-export const insertTargetSchema = createInsertSchema(targets).pick({
-  firstName: true,
-  lastName: true,
-  email: true,
-  position: true,
-  department: true,
+// Allow creating targets with just an email; first/last names will be defaulted in routes
+export const insertTargetSchema = z.object({
+  firstName: z.string().optional(),
+  lastName: z.string().optional(),
+  email: z.string().email("Please provide a valid email address"),
+  position: z.string().optional(),
+  department: z.string().optional(),
 });
 
 export const insertSmtpProfileSchema = createInsertSchema(smtpProfiles).pick({
@@ -370,14 +376,27 @@ export const insertSmtpProfileSchema = createInsertSchema(smtpProfiles).pick({
 export const insertEmailTemplateSchema = z.object({
   name: z.string().min(1, "Template name is required"),
   subject: z.string().min(1, "Subject is required"),
-  html_content: z.string().min(1, "HTML content is required"),
+  htmlContent: z.string().min(1, "HTML content is required").optional(),
+  html_content: z.string().min(1, "HTML content is required").optional(),
+  textContent: z.string().optional(),
   text_content: z.string().optional(),
-  sender_name: z.string().min(1, "Sender name is required"),
-  sender_email: z.string().email("Invalid email format").min(1, "Sender email is required"),
+  senderName: z.string().min(1, "Sender name is required").optional(),
+  sender_name: z.string().min(1, "Sender name is required").optional(),
+  senderEmail: z.string().email("Invalid email format").min(1, "Sender email is required").optional(),
+  sender_email: z.string().email("Invalid email format").min(1, "Sender email is required").optional(),
   type: z.string().optional(),
   complexity: z.string().optional(),
   description: z.string().optional(),
   category: z.string().optional(),
+}).refine(data => data.htmlContent || data.html_content, {
+  message: "HTML content is required",
+  path: ["htmlContent"]
+}).refine(data => data.senderName || data.sender_name, {
+  message: "Sender name is required",
+  path: ["senderName"]
+}).refine(data => data.senderEmail || data.sender_email, {
+  message: "Sender email is required",
+  path: ["senderEmail"]
 });
 
 export const insertLandingPageSchema = createInsertSchema(landingPages).pick({
@@ -387,21 +406,76 @@ export const insertLandingPageSchema = createInsertSchema(landingPages).pick({
   redirectUrl: true,
   pageType: true,
   thumbnail: true,
+  captureData: true,
+  capturePasswords: true,
 });
 
 export const updateLandingPageSchema = insertLandingPageSchema.partial();
 
-export const insertCampaignSchema = createInsertSchema(campaigns).pick({
-  name: true,
-  targetGroupId: true,
-  smtpProfileId: true,
-  emailTemplateId: true,
-  landingPageId: true,
-  scheduledAt: true,
-  endDate: true,
+// Base campaign schema (no refinements) so we can reuse for update with partial()
+const campaignBaseSchema = z.object({
+  name: z.string().min(1, "Campaign name is required"),
+  targetGroupId: z.number().int().positive("Target group is required"),
+  smtpProfileId: z.number().int().positive("SMTP profile is required"),
+  emailTemplateId: z.number().int().positive("Email template is required"),
+  landingPageId: z.number().int().positive("Landing page is required"),
+  scheduledAt: z
+    .union([z.string(), z.date()])
+    .transform((val) => (typeof val === 'string' ? new Date(val) : val))
+    .refine((d) => !(d instanceof Date) || !isNaN(d.getTime()), { message: 'Invalid scheduledAt date format' })
+    .optional(),
+  endDate: z
+    .union([z.string(), z.date()])
+    .transform((val) => (typeof val === 'string' ? new Date(val) : val))
+    .refine((d) => !(d instanceof Date) || !isNaN(d.getTime()), { message: 'Invalid endDate date format' })
+    .optional(),
 });
 
-export const updateCampaignSchema = insertCampaignSchema.partial();
+export const insertCampaignSchema = campaignBaseSchema
+  .refine(
+    (data) => {
+      if (!data.scheduledAt || !data.endDate) return true;
+      return data.scheduledAt < data.endDate;
+    },
+    { message: 'scheduledAt must be before endDate', path: ['endDate'] }
+  )
+  .refine(
+    (data) => {
+      if (!data.scheduledAt) return true;
+      return data.scheduledAt.getTime() >= Date.now() - 60_000;
+    },
+    { message: 'scheduledAt must be in the future', path: ['scheduledAt'] }
+  )
+  .refine(
+    (data) => {
+      if (!data.endDate) return true;
+      return data.endDate.getTime() >= Date.now() - 60_000;
+    },
+    { message: 'endDate must be in the future', path: ['endDate'] }
+  );
+
+export const updateCampaignSchema = campaignBaseSchema.partial()
+  .refine(
+    (data) => {
+      if (!data.scheduledAt || !data.endDate) return true;
+      return data.scheduledAt < data.endDate;
+    },
+    { message: 'scheduledAt must be before endDate', path: ['endDate'] }
+  )
+  .refine(
+    (data) => {
+      if (!data.scheduledAt) return true;
+      return data.scheduledAt.getTime() >= Date.now() - 60_000;
+    },
+    { message: 'scheduledAt must be in the future', path: ['scheduledAt'] }
+  )
+  .refine(
+    (data) => {
+      if (!data.endDate) return true;
+      return data.endDate.getTime() >= Date.now() - 60_000;
+    },
+    { message: 'endDate must be in the future', path: ['endDate'] }
+  );
 
 export const insertCampaignResultSchema = createInsertSchema(campaignResults).pick({
   campaignId: true,

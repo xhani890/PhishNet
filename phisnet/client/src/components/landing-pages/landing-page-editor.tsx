@@ -10,8 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { Loader2, Globe, Save, Eye, EyeOff, Image as ImageIcon } from "lucide-react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Loader2, Globe, Save, Eye, EyeOff, Image as ImageIcon, ShieldOff } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
 
 const landingPageSchema = z.object({
@@ -21,6 +21,8 @@ const landingPageSchema = z.object({
   redirectUrl: z.string().url("Please enter a valid URL").optional().or(z.literal("")),
   pageType: z.string().min(1, "Page type is required"),
   thumbnail: z.string().optional(),
+  captureData: z.boolean().default(true),
+  capturePasswords: z.boolean().default(false),
 });
 
 type LandingPageFormValues = z.infer<typeof landingPageSchema>;
@@ -50,6 +52,8 @@ export default function LandingPageEditor({ onClose, page }: LandingPageEditorPr
       redirectUrl: page?.redirectUrl || "",
       pageType: page?.pageType || "login",
       thumbnail: page?.thumbnail || "",
+  captureData: page?.captureData ?? true,
+  capturePasswords: page?.capturePasswords ?? false,
     },
   });
 
@@ -90,8 +94,23 @@ export default function LandingPageEditor({ onClose, page }: LandingPageEditorPr
       return await response.json();
     },
     onSuccess: (data) => {
-      form.setValue("htmlContent", data.html);
+      // Support both { htmlContent } and legacy { html }
+      const html = data.htmlContent || data.html || "";
+      form.setValue("htmlContent", html);
       form.setValue("name", data.title || "Cloned Website");
+      // Try to extract a thumbnail from the HTML
+      try {
+        const og = html.match(/<meta\s+property=["']og:image["']\s+content=["']([^"']+)["']/i);
+        const img = html.match(/<img[^>]+src=["']([^"']+)["'][^>]*>/i);
+        let thumb = og?.[1] || img?.[1] || null;
+        if (thumb && thumb.startsWith('/') && urlToClone) {
+          try {
+            const base = new URL(urlToClone).origin;
+            thumb = base + thumb;
+          } catch {}
+        }
+        if (thumb) setThumbnailSource(thumb);
+      } catch {}
       setIsCloning(false);
       setUrlToClone("");
       toast({
@@ -131,40 +150,7 @@ export default function LandingPageEditor({ onClose, page }: LandingPageEditorPr
     }
   };
 
-  // Function to extract thumbnail from the cloned page
-  const extractThumbnail = () => {
-    // Try to find image tags in the HTML
-    const htmlContent = form.getValues("htmlContent");
-    
-    // First look for Open Graph images which are often good representatives of the page
-    const ogImageMatch = htmlContent.match(/<meta\s+property=["']og:image["']\s+content=["']([^"']+)["']/i);
-    if (ogImageMatch && ogImageMatch[1]) {
-      setThumbnailSource(ogImageMatch[1]);
-      return;
-    }
-    
-    // Then try to find the first image in the header or top of the page
-    const imgMatch = htmlContent.match(/<img[^>]+src=["']([^"']+)["'][^>]*>/i);
-    if (imgMatch && imgMatch[1]) {
-      let imgSrc = imgMatch[1];
-      
-      // Handle relative URLs
-      if (imgSrc.startsWith('/') && urlToClone) {
-        try {
-          const baseUrl = new URL(urlToClone).origin;
-          imgSrc = baseUrl + imgSrc;
-        } catch (e) {
-          console.error("Failed to create absolute URL for thumbnail", e);
-        }
-      }
-      
-      setThumbnailSource(imgSrc);
-      return;
-    }
-    
-    // If no image is found, we'll use the default ghost icon
-    setThumbnailSource(null);
-  };
+  // Thumbnail extraction happens during clone onSuccess
 
   // Update the preview whenever HTML content changes
   useEffect(() => {
@@ -207,15 +193,15 @@ export default function LandingPageEditor({ onClose, page }: LandingPageEditorPr
             </div>
             <div className="space-y-3">
               <div>
-                <FormLabel>Website URL</FormLabel>
-                <FormControl>
+        <label className="text-sm font-medium" htmlFor="clone-url">Website URL</label>
+                <div className="mt-1">
                   <Input
+          id="clone-url"
                     placeholder="https://example.com"
                     value={urlToClone}
                     onChange={(e) => setUrlToClone(e.target.value)}
                   />
-                </FormControl>
-                <FormMessage />
+                </div>
                 <p className="text-xs text-muted-foreground mt-1">
                   Enter the URL of the website you want to clone
                 </p>
@@ -290,7 +276,58 @@ export default function LandingPageEditor({ onClose, page }: LandingPageEditorPr
                   )}
                 />
               </div>
-              
+
+              <FormField
+                control={form.control}
+                name="captureData"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col">
+                    <FormLabel>Capture Submitted Data</FormLabel>
+                    <FormControl>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={field.value}
+                          onChange={(e) => field.onChange(e.target.checked)}
+                          className="h-4 w-4"
+                        />
+                        <span className="text-sm text-muted-foreground">Store non-sensitive form fields when users submit the page</span>
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="capturePasswords"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col">
+                    <FormLabel>Capture Passwords (Advanced)</FormLabel>
+                    <FormControl>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={field.value}
+                          disabled={!form.getValues("captureData")}
+                          onChange={(e) => field.onChange(e.target.checked)}
+                          className="h-4 w-4"
+                        />
+                        <span className="text-sm text-muted-foreground">Include fields that look like passwords (use with caution)</span>
+                      </div>
+                    </FormControl>
+                    {field.value && (
+                      <div className="text-xs text-yellow-600 mt-1 flex items-center gap-1">
+                        <ShieldOff className="h-3 w-3" />
+                        Capturing passwords stores raw secrets. Ensure legal consent and secure handling.
+                      </div>
+                    )}
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
               <FormField
                 control={form.control}
                 name="description"

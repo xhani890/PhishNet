@@ -1,0 +1,98 @@
+PhishNet - Completed / Done Items
+================================
+
+Legend: ✓ completed, ➕ improvement, ♻ refactor/cleanup
+
+1. Authentication & User Management
+   ✓ Fixed login failures (scrypt password hash alignment)
+   ✓ Added users.is_active column and backfilled TRUE
+   ✓ Implemented password reset (forgot password) flow with tokens & email (SMTP / SendGrid fallback)
+   ✓ Added lockout & failed attempt fields in migration script (idempotent)
+   ✓ Implemented profile update & change password endpoints
+
+2. Database Integrity & Migrations
+   ✓ Confirmed correct database (phishnet) usage
+   ✓ Added campaign_results.organization_id column with backfill & NOT NULL + FK + index
+   ✓ Extended migration script for landing_pages capture flags (capture_data, capture_passwords)
+   ✓ Idempotent migration runner updated and executed successfully
+
+3. SMTP & Email Sending
+   ✓ Configured SMTP profile (Gmail) & verified transporter
+   ✓ Implemented campaign email send logic with per-recipient inserts
+   ✓ Immediate send & scheduled (deferred) campaign support
+   ✓ Updated tracking links from legacy /track to new /l/:campaignId/:targetId
+   ✓ Added backward-compatible /track redirect
+
+4. Campaigns Lifecycle & Scheduler
+   ✓ Fixed campaigns not appearing in list (response shape + mapping)
+   ✓ Implemented background scheduler (interval scan) to auto-activate due campaigns
+   ✓ Added manual launch endpoint /api/campaigns/:id/launch
+   ✓ Normalized status transitions (Draft → Scheduled → Active)
+
+5. Groups & Targets
+   ✓ Fixed target group endpoint & retrieval mismatch (now shows targets correctly)
+   ✓ Enabled email-only target creation with sensible default names (Recipient/User)
+   ✓ Implemented CSV import with normalization & validation (Zod)
+
+6. Landing Pages (CRUD & UX)
+   ✓ Implemented list/create/update/delete endpoints with auth & org scoping
+   ✓ Added preview endpoint returning raw HTML
+   ✓ Added clone by ID and clone by external URL (fetch) with title extraction
+   ✓ Sorting by pageType then name (server + client fallback)
+   ✓ Fixed clone UI crash (useFormContext null) by restructuring panel
+   ✓ Auto thumbnail extraction (OG:image / first <img>) on clone
+   ✓ Preserved capture flags on clone
+
+7. Public Landing & Tracking / Capture
+   ✓ Implemented public render route /l/:campaignId/:targetId with injected form auto-post script
+   ✓ Implemented submission endpoint /l/submit capturing form fields
+   ✓ Excluded password fields by default (heuristic)
+   ✓ Added landing page flags: captureData (default true) & capturePasswords (default false)
+   ✓ Submission handler now respects flags (store nothing, filter, or include all)
+   ✓ Added redirect support using landing page redirectUrl after submission
+
+8. Campaign Results & Metrics
+   ✓ Ensured organizationId always stored with results
+   ✓ Added composite update helper (campaignId + targetId) for capture path
+   ✓ Status updates for sent/opened/clicked/submitted events stubbed (submitted implemented)
+   ✓ Dashboard stats & phishing metrics queries (campaign counts, success rates)
+   ✓ At-risk users aggregation (clicked/submitted heuristic)
+
+9. Email Templates
+   ✓ CRUD endpoints with mapping between snake_case and camelCase
+   ✓ Normalized default sender fields & category/type attributes
+   ✓ Added immediate validation & logging for template creation
+
+10. Security & Validation
+    ✓ Consistent organizational ownership checks on all protected resources
+    ✓ Zod validation on create/update for campaigns, groups, targets, templates, pages
+    ✓ Filtered password-like fields unless capturePasswords enabled
+
+11. UX / Client Enhancements
+    ✓ Toast feedback for clone/delete landing page actions
+    ✓ Confirmation prompt before delete
+    ✓ Editor enhancements: tabbed HTML editor/preview, capture options checkboxes, warnings
+    ✓ Automatic field defaults / improved error reporting
+
+12. Infrastructure & Tooling
+    ✓ Added urlencoded parser for form POST capture (extended: true)
+    ✓ Session ping endpoint to refresh sessions & show remaining lifetime
+    ✓ Central error handler with statistics endpoint & clear/reset endpoints
+    ✓ Notification service endpoints (list, mark read, create, preferences)
+
+13. Backward Compatibility
+    ✓ Added /track redirect to /l/:c/:t for legacy emails
+    ✓ Handling of both legacy html & new htmlContent fields on cloned pages
+
+14. Code Quality / Maintainability
+    ✓ Storage layer helpers for composite updates & ordered listing
+    ✓ Idempotent migrations with logging & safe retries
+    ✓ Simplified clone panel to avoid React context misuse
+
+15. Future / Not Yet Implemented (Documented but Pending)
+    ➕ Full open & click event recording (only partial statuses now)
+    ➕ UI display of submitted form data within campaign results view
+    ➕ Granular audit logs & role-based permission matrix expansion
+    ➕ Encryption / hashing strategy for captured sensitive fields (if retaining)
+
+Summary: Core phishing workflow (targets → campaign → email → landing → submission capture → results) is operational with org scoping, scheduling, and configurable data capture policies.

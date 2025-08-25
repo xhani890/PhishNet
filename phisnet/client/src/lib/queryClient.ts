@@ -42,7 +42,10 @@ export async function refreshSession(skipForUserEndpoint: boolean = false): Prom
     // Store this ping time
     sessionStorage.setItem('lastSessionPing', now.toString());
     
-    const response = await fetch('/api/session-ping', { 
+    // Use the API base URL from environment variables
+    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+    
+    const response = await fetch(`${baseUrl}/api/session-ping`, { 
       method: 'POST',
       credentials: 'include',
       headers: {
@@ -79,7 +82,11 @@ export async function apiRequest(
   // Refresh the session before making the actual request
   await refreshSession(isUserEndpoint);
   
-  const res = await fetch(url, {
+  // Use the API base URL from environment variables
+  const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+  const fullUrl = url.startsWith('http') ? url : `${baseUrl}${url}`;
+  
+  const res = await fetch(fullUrl, {
     method,
     headers: data ? { "Content-Type": "application/json" } : {},
     body: data ? JSON.stringify(data) : undefined,
@@ -103,7 +110,11 @@ export const getQueryFn: <T>(options: {
     // Refresh the session before making the actual request
     await refreshSession(isUserEndpoint);
     
-    const res = await fetch(url, {
+    // Use the API base URL from environment variables
+    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+    const fullUrl = url.startsWith('http') ? url : `${baseUrl}${url}`;
+    
+    const res = await fetch(fullUrl, {
       credentials: "include",
     });
 

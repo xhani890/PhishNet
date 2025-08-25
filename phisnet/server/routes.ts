@@ -1,18 +1,13 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { setupAuth, isAuthenticated, isAdmin, hasOrganization, hashPassword, comparePasswords, refreshSession } from "./auth";
+import { setupAuth, isAuthenticated, isAdmin, hasOrganization, hashPassword, comparePasswords } from "./auth";
 import { db } from "./db";
 import { 
   campaigns, 
   campaignResults, 
   emailTemplates, 
   users, 
-  organizations,
-  targets,
-  groups,
-  notificationsSchema,
-  notificationPreferencesSchema,
   rolesSchema,
   userRolesSchema,
   insertGroupSchema, 
@@ -21,18 +16,18 @@ import {
   insertEmailTemplateSchema, 
   insertLandingPageSchema, 
   insertCampaignSchema,
-  updateLandingPageSchema,
   type User
 } from "@shared/schema";
-import { eq, and, or, desc, asc, count, sql, gte, lte, isNull, isNotNull } from "drizzle-orm";
+import { eq, and, sql, gte, lte } from "drizzle-orm";
 import multer from "multer";
 import Papa from "papaparse";
 import { z } from "zod";
-import { errorHandler, assertUser, mapDatabaseFields } from './error-handler';
+import { errorHandler, assertUser } from './error-handler';
 import { NotificationService } from './services/notification-service';
 import { exportReportToCsv } from './utils/report-exporter';
 import path from 'path';
 import fs from 'fs';
+import { sendCampaignEmails } from './services/email-service';
 
 const upload = multer();
 
@@ -117,19 +112,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       .groupBy(emailTemplates.type)
       .orderBy(sql`count(CASE WHEN ${campaignResults.status} IN ('clicked', 'submitted') THEN 1 END) DESC`);
       
-      const threatData = threats.map(threat => ({
-        id: Math.random(), // Add id for React keys
-        name: threat.type || 'Unknown',
-        description: `${threat.successful} successful attacks out of ${threat.totalSent} attempts`,
-        level: threat.totalSent > 0 ? 
-          (threat.successful / threat.totalSent > 0.3 ? 'high' : 
-           threat.successful / threat.totalSent > 0.15 ? 'medium' : 'low') : 'low' as "high" | "medium" | "low",
-        severity: threat.totalSent > 0 ? 
-          (threat.successful / threat.totalSent > 0.3 ? 'High' : 
-           threat.successful / threat.totalSent > 0.15 ? 'Medium' : 'Low') : 'Low',
-        count: threat.successful,
-        trend: 'stable',
-      }));
+      const threatData = threats.map(threat => {
+        const ratio = threat.totalSent > 0 ? threat.successful / threat.totalSent : 0;
+        let level: 'high' | 'medium' | 'low' = 'low';
+        let severity: 'High' | 'Medium' | 'Low' = 'Low';
+        if (ratio > 0.3) { level = 'high'; severity = 'High'; }
+        else if (ratio > 0.15) { level = 'medium'; severity = 'Medium'; }
+        return {
+          id: Math.random(), // Add id for React keys
+          name: threat.type || 'Unknown',
+          description: `${threat.successful} successful attacks out of ${threat.totalSent} attempts`,
+          level,
+          severity,
+          count: threat.successful,
+          trend: 'stable',
+        };
+      });
       
       res.json(threatData);
     } catch (error) {
@@ -330,8 +328,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const validatedData = insertTargetSchema.parse(req.body);
+      // Provide sensible defaults if names are missing
+      const firstName = validatedData.firstName && validatedData.firstName.trim().length > 0 ? validatedData.firstName : 'Recipient';
+      const lastName = validatedData.lastName && validatedData.lastName.trim().length > 0 ? validatedData.lastName : 'User';
       const targetData = {
         ...validatedData,
+        firstName,
+        lastName,
         organizationId: req.user.organizationId,
         groupId: groupId
       };
@@ -394,10 +397,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           // Validate the data
           const validatedData = insertTargetSchema.parse(normalizedRow);
-          
+          // Provide sensible defaults if names are missing
+          const firstName = validatedData.firstName && (validatedData.firstName as string).toString().trim().length > 0 ? (validatedData.firstName as string) : 'Recipient';
+          const lastName = validatedData.lastName && (validatedData.lastName as string).toString().trim().length > 0 ? (validatedData.lastName as string) : 'User';
           // Create the target with required properties
           const targetData = {
             ...validatedData,
+            firstName,
+            lastName,
             organizationId: req.user.organizationId,
             groupId: groupId
           };
@@ -486,7 +493,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/email-templates", isAuthenticated, hasOrganization, async (req, res) => {
     try {
       assertUser(req.user);
+      console.log("Received template data:", req.body);
       const validatedData = insertEmailTemplateSchema.parse(req.body);
+      console.log("Validated template data:", validatedData);
       
       // Create a template using existing storage method
       const template = await storage.createEmailTemplate(
@@ -495,18 +504,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         {
           name: validatedData.name,
           subject: validatedData.subject,
-          // Fix the field mapping to match database schema:
-          html_content: validatedData.html_content || "<div>Default content</div>",
-          text_content: validatedData.text_content || null,
-          sender_name: validatedData.sender_name || "PhishNet Team",
-          sender_email: validatedData.sender_email || "phishing@example.com",
+          // Fix the field mapping to match Drizzle schema (snake_case):
+          html_content: validatedData.htmlContent || validatedData.html_content || "<div>Default content</div>",
+          text_content: validatedData.textContent || validatedData.text_content || null,
+          sender_name: validatedData.senderName || validatedData.sender_name || "PhishNet Team",
+          sender_email: validatedData.senderEmail || validatedData.sender_email || "phishing@example.com",
           type: validatedData.type,
           complexity: validatedData.complexity,
           description: validatedData.description,
           category: validatedData.category,
-          organization_id: req.user.organizationId
+          // Satisfy InsertEmailTemplate type
+          organization_id: req.user.organizationId,
         }
       );
+      console.log("Created template:", template);
       
       res.status(201).json(template);
     } catch (error) {
@@ -575,7 +586,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/landing-pages", isAuthenticated, hasOrganization, async (req, res) => {
     try {
       assertUser(req.user);
-      const pages = await storage.listLandingPages(req.user.organizationId);
+  const pages = await storage.listLandingPages(req.user.organizationId);
       res.json(pages);
     } catch (error) {
       res.status(500).json({ message: "Error fetching landing pages" });
@@ -609,6 +620,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put("/api/landing-pages/:id", isAuthenticated, hasOrganization, async (req, res) => {
     try {
+  assertUser(req.user);
       const pageId = parseInt(req.params.id);
       const page = await storage.getLandingPage(pageId);
       
@@ -617,7 +629,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Ensure user has access to this page
-      if (page.organizationId !== req.user.organizationId) {
+  if (page.organizationId !== req.user.organizationId) {
         return res.status(403).json({ message: "Access denied" });
       }
       
@@ -640,6 +652,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   app.delete("/api/landing-pages/:id", isAuthenticated, hasOrganization, async (req, res) => {
     try {
+  assertUser(req.user);
       const pageId = parseInt(req.params.id);
       const page = await storage.getLandingPage(pageId);
       
@@ -648,7 +661,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Ensure user has access to this page
-      if (page.organizationId !== req.user.organizationId) {
+  if (page.organizationId !== req.user.organizationId) {
         return res.status(403).json({ message: "Access denied" });
       }
       
@@ -661,6 +674,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting landing page:", error);
       res.status(500).json({ message: "Error deleting landing page" });
+    }
+  });
+
+  // Landing Page preview (returns raw HTML)
+  app.get("/api/landing-pages/:id/preview", isAuthenticated, hasOrganization, async (req, res) => {
+    try {
+      assertUser(req.user);
+      const pageId = parseInt(req.params.id);
+      const page = await storage.getLandingPage(pageId);
+      if (!page) {
+        return res.status(404).send("Not Found");
+      }
+      if (page.organizationId !== req.user.organizationId) {
+        return res.status(403).send("Forbidden");
+      }
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      return res.status(200).send(page.htmlContent || '<!doctype html><html><body><p>No content</p></body></html>');
+    } catch (error) {
+      console.error('Error rendering landing page preview:', error);
+      return res.status(500).send('Preview error');
     }
   });
 
@@ -690,10 +723,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Get HTML content as text
         const htmlContent = await response.text();
-        
-        // Return as proper JSON with HTML content as a string property
+        // Try to extract <title>
+        let title: string | undefined;
+        try {
+          const m = htmlContent.match(/<title>([^<]*)<\/title>/i);
+          title = m?.[1]?.trim();
+        } catch {}
+        // Return JSON used by the client editor
         return res.json({ 
           htmlContent,
+          title: title || 'Cloned Website',
           message: "Website cloned successfully" 
         });
       } catch (error) {
@@ -708,29 +747,288 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Backward-compatible tracking route: redirect legacy /track?c=&t= to /l/:c/:t
+  app.get('/track', async (req, res) => {
+    const c = parseInt(String(req.query.c));
+    const t = parseInt(String(req.query.t));
+    if (!Number.isFinite(c) || !Number.isFinite(t)) {
+      return res.status(400).send('Bad Request');
+    }
+    return res.redirect(302, `/l/${c}/${t}`);
+  });
+
+  // Open tracking pixel (1x1 transparent gif)
+  app.get('/o/:campaignId/:targetId.gif', async (req, res) => {
+    try {
+      const campaignId = parseInt(req.params.campaignId, 10);
+      const targetId = parseInt(req.params.targetId, 10);
+      if (!Number.isFinite(campaignId) || !Number.isFinite(targetId)) {
+        return res.status(400).end();
+      }
+      const campaign = await storage.getCampaign(campaignId);
+      const target = await storage.getTarget(targetId);
+      if (!campaign || !target || campaign.organizationId !== target.organizationId) {
+        return res.status(404).end();
+      }
+      // Idempotent update: only set opened if not already opened and preserve higher precedence statuses
+      try {
+        // Fetch existing row (if any) by attempting update; if none updated, create later.
+        const existing = await storage.updateCampaignResultByCampaignAndTarget(campaignId, targetId, {} as any);
+        if (existing) {
+          const newData: any = {};
+            if (!existing.opened) {
+              newData.opened = true;
+              newData.openedAt = new Date();
+            }
+            // Only set status to opened if current status is pending or sent
+            if (['pending', 'sent'].includes(existing.status)) {
+              newData.status = 'opened';
+            }
+          if (Object.keys(newData).length > 0) {
+            await storage.updateCampaignResultByCampaignAndTarget(campaignId, targetId, newData);
+          }
+        } else {
+          await storage.createCampaignResult({
+            campaignId, targetId, organizationId: campaign.organizationId,
+            sent: false, opened: true, openedAt: new Date(), clicked: false, submitted: false,
+            status: 'opened'
+          } as any);
+        }
+      } catch (e) {
+        console.error('Open pixel record error:', e);
+      }
+
+      // 1x1 transparent GIF bytes
+      const gif = Buffer.from('R0lGODlhAQABAIAAAP///////yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64');
+      res.setHeader('Content-Type', 'image/gif');
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+      return res.status(200).end(gif);
+    } catch (e) {
+      console.error('Open pixel error:', e);
+      return res.status(500).end();
+    }
+  });
+
+  // Click tracking redirect
+  app.get('/c/:campaignId/:targetId', async (req, res) => {
+    try {
+      const campaignId = parseInt(req.params.campaignId, 10);
+      const targetId = parseInt(req.params.targetId, 10);
+      const encoded = String(req.query.u || '');
+      if (!Number.isFinite(campaignId) || !Number.isFinite(targetId) || !encoded) {
+        return res.status(400).send('Bad Request');
+      }
+      const campaign = await storage.getCampaign(campaignId);
+      const target = await storage.getTarget(targetId);
+      if (!campaign || !target || campaign.organizationId !== target.organizationId) {
+        return res.status(404).send('Not Found');
+      }
+      let url: string | undefined;
+      try {
+        const decoded = Buffer.from(decodeURIComponent(encoded), 'base64').toString('utf8');
+        // Basic allowlist: only http/https
+        if (/^https?:\/\//i.test(decoded)) url = decoded;
+      } catch {}
+      if (!url) return res.status(400).send('Invalid URL');
+      try {
+        const existing = await storage.updateCampaignResultByCampaignAndTarget(campaignId, targetId, {} as any);
+        if (existing) {
+          const newData: any = {};
+          if (!existing.clicked) {
+            newData.clicked = true;
+            newData.clickedAt = new Date();
+          }
+          // Do not downgrade submitted
+          if (existing.status !== 'submitted') {
+            // If status was pending or sent -> clicked. If opened -> clicked.
+            if (['pending', 'sent', 'opened'].includes(existing.status)) {
+              newData.status = 'clicked';
+            }
+          }
+          if (Object.keys(newData).length > 0) {
+            await storage.updateCampaignResultByCampaignAndTarget(campaignId, targetId, newData);
+          }
+        } else {
+          await storage.createCampaignResult({
+            campaignId, targetId, organizationId: campaign.organizationId,
+            sent: false, opened: false, clicked: true, clickedAt: new Date(), submitted: false,
+            status: 'clicked'
+          } as any);
+        }
+      } catch (e) {
+        console.error('Click record error:', e);
+      }
+      return res.redirect(302, url);
+    } catch (e) {
+      console.error('Click redirect error:', e);
+      return res.status(500).send('Server Error');
+    }
+  });
+
+  // Public Landing Page rendering with form capture injection
+  app.get('/l/:campaignId/:targetId', async (req, res) => {
+    try {
+      const campaignId = parseInt(req.params.campaignId);
+      const targetId = parseInt(req.params.targetId);
+      if (!Number.isFinite(campaignId) || !Number.isFinite(targetId)) {
+        return res.status(400).send('Bad Request');
+      }
+      const campaign = await storage.getCampaign(campaignId);
+      if (!campaign) return res.status(404).send('Not Found');
+      const target = await storage.getTarget(targetId);
+      if (!target) return res.status(404).send('Not Found');
+      if (target.organizationId !== campaign.organizationId) return res.status(403).send('Forbidden');
+      const page = await storage.getLandingPage(campaign.landingPageId);
+      if (!page) return res.status(404).send('Not Found');
+      const injection = `\n<script>(function(){try{var cid=${campaignId},tid=${targetId};document.querySelectorAll('form').forEach(function(f){try{f.method='POST';f.action='/l/submit?c='+cid+'&t='+tid;}catch(e){}});}catch(e){}})();</script>`;
+      const html = (page.htmlContent || '<!doctype html><html><body></body></html>');
+      const out = /<\/body\s*>/i.test(html) ? html.replace(/<\/body\s*>/i, injection + '</body>') : html + injection;
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      return res.status(200).send(out);
+    } catch (e) {
+      console.error('Landing page render error:', e);
+      return res.status(500).send('Server Error');
+    }
+  });
+
+  // Public form submission capture (excludes password fields)
+  app.post('/l/submit', async (req, res) => {
+    try {
+      const campaignId = parseInt(String(req.query.c));
+      const targetId = parseInt(String(req.query.t));
+      if (!Number.isFinite(campaignId) || !Number.isFinite(targetId)) {
+        return res.status(400).send('Bad Request');
+      }
+      const campaign = await storage.getCampaign(campaignId);
+      if (!campaign) return res.status(404).send('Not Found');
+      const target = await storage.getTarget(targetId);
+      if (!target) return res.status(404).send('Not Found');
+      if (target.organizationId !== campaign.organizationId) return res.status(403).send('Forbidden');
+      // Load landing page to honor capture flags
+      const page = await storage.getLandingPage(campaign.landingPageId);
+      const captureData = page?.captureData !== false; // default true
+      const capturePasswords = page?.capturePasswords === true; // default false
+
+      // Prepare submitted data according to flags
+      const body: Record<string, any> = req.body || {};
+      let submittedData: Record<string, any> | null = null;
+      if (captureData) {
+        if (capturePasswords) {
+          // Capture everything as-is
+          submittedData = { ...body };
+        } else {
+          // Exclude password-like fields by heuristic
+          const filtered: Record<string, any> = {};
+          for (const [k, v] of Object.entries(body)) {
+            if (/passw|pwd/i.test(k)) continue;
+            filtered[k] = v;
+          }
+          submittedData = filtered;
+        }
+      } else {
+        submittedData = null; // record the event but don't store data
+      }
+
+      // Update or create result row
+      try {
+        // Try updating existing result for this campaign+target
+        const updated = await storage.updateCampaignResultByCampaignAndTarget(campaignId, targetId, {
+          submitted: true,
+          submittedAt: new Date(),
+          submittedData: submittedData as any,
+          status: 'submitted',
+        } as any);
+        if (!updated) {
+          await storage.createCampaignResult({
+            campaignId,
+            targetId,
+            organizationId: campaign.organizationId,
+            sent: false,
+            opened: false,
+            clicked: false,
+            submitted: true,
+            submittedAt: new Date(),
+            submittedData: submittedData as any,
+            status: 'submitted',
+          } as any);
+        }
+      } catch (err) {
+        console.error('Error recording submission:', err);
+      }
+
+      // Redirect if landing page has redirectUrl
+      const page2 = page || (await storage.getLandingPage(campaign.landingPageId));
+      if (page2?.redirectUrl) {
+        return res.redirect(302, page2.redirectUrl);
+      }
+      return res.status(204).end();
+    } catch (e) {
+      console.error('Submission capture error:', e);
+      return res.status(500).send('Server Error');
+    }
+  });
+  // Clone an existing landing page by ID
+  app.post("/api/landing-pages/:id/clone", isAuthenticated, hasOrganization, async (req, res) => {
+    try {
+      assertUser(req.user);
+      const pageId = parseInt(req.params.id);
+      const page = await storage.getLandingPage(pageId);
+      if (!page) {
+        return res.status(404).json({ message: "Landing page not found" });
+      }
+      if (page.organizationId !== req.user.organizationId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      const cloned = await storage.createLandingPage(req.user.organizationId, req.user.id, {
+        name: `${page.name} (Copy)`,
+        description: page.description || null,
+        htmlContent: page.htmlContent,
+        redirectUrl: page.redirectUrl || null,
+        pageType: page.pageType,
+        thumbnail: page.thumbnail || null,
+  captureData: (page as any).captureData ?? true,
+  capturePasswords: (page as any).capturePasswords ?? false,
+      } as any);
+      return res.status(201).json(cloned);
+    } catch (error) {
+      console.error('Error cloning landing page by id:', error);
+      return res.status(500).json({ message: 'Error cloning landing page' });
+    }
+  });
+
   // Campaigns Endpoints
   app.get("/api/campaigns", isAuthenticated, async (req, res) => {
     try {
+      assertUser(req.user);
       const campaignList = await storage.listCampaigns(req.user.organizationId);
-      
-      // Include group names and other related data
-      const campaigns = [];
-      for (const campaign of campaignList) {
-        const group = await storage.getGroup(campaign.targetGroupId);
-        const targets = await storage.listTargets(campaign.targetGroupId);
-        
-        campaigns.push({
-          ...campaign,
-          targetGroup: group?.name || "Unknown",
-          totalTargets: targets.length,
-          sentCount: 0, // In a real app, calculate this from results
-          openRate: Math.floor(Math.random() * 100), // Mock data
-          clickRate: Math.floor(Math.random() * 70), // Mock data
+
+      const mapped = [] as any[];
+      for (const c of campaignList) {
+        const group = await storage.getGroup(c.targetGroupId);
+        const targets = await storage.listTargets(c.targetGroupId);
+        const results = await storage.listCampaignResults(c.id);
+        const opened = results.filter(r => r.opened).length;
+        const clicked = results.filter(r => r.clicked).length;
+
+        mapped.push({
+          id: c.id,
+          name: c.name,
+          status: (c.status || 'Draft').toString().toLowerCase(),
+          created_at: c.createdAt instanceof Date ? c.createdAt.toISOString() : c.createdAt,
+          targets: targets.length,
+          opened,
+          clicked,
+          organizationId: c.organizationId,
+          // Convenience extras the UI might show later
+          targetGroup: group?.name || 'Unknown',
         });
       }
-      
-      res.json(campaigns);
+
+      res.json({ campaigns: mapped });
     } catch (error) {
+      console.error('Error fetching campaigns:', error);
       res.status(500).json({ message: "Error fetching campaigns" });
     }
   });
@@ -738,6 +1036,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/campaigns", isAuthenticated, hasOrganization, async (req, res) => {
     try {
       console.log("Campaign creation request body:", req.body);
+  assertUser(req.user);
       
       // Attempt to validate the data
       let validatedData;
@@ -765,18 +1064,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid SMTP profile" });
       }
       
-      const emailTemplate = await storage.getEmailTemplate(Number(validatedData.emailTemplateId));
-      if (!emailTemplate || emailTemplate.organizationId !== req.user.organizationId) {
+  const emailTemplate = await storage.getEmailTemplate(Number(validatedData.emailTemplateId));
+  const emailTemplateOrgId = emailTemplate ? ((emailTemplate as any).organizationId ?? (emailTemplate as any).organization_id) : undefined;
+  if (!emailTemplate || emailTemplateOrgId !== req.user.organizationId) {
         return res.status(400).json({ message: "Invalid email template" });
       }
       
-      const landingPage = await storage.getLandingPage(Number(validatedData.landingPageId));
-      if (!landingPage || landingPage.organizationId !== req.user.organizationId) {
+  const landingPage = await storage.getLandingPage(Number(validatedData.landingPageId));
+  if (!landingPage || landingPage.organizationId !== req.user.organizationId) {
         return res.status(400).json({ message: "Invalid landing page" });
       }
       
       // Create the campaign
-      const campaign = await storage.createCampaign(
+  const campaign = await storage.createCampaign(
         req.user.organizationId, 
         req.user.id, 
         {
@@ -791,7 +1091,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
           endDate: validatedData.endDate || null,
         }
       );
-      
+      // If no schedule provided, send immediately in background
+      if (!validatedData.scheduledAt) {
+        const orgIdImmediate = req.user.organizationId;
+        (async () => {
+          try {
+            await storage.updateCampaign(campaign.id, { status: 'Active' });
+            const result = await sendCampaignEmails(campaign.id, orgIdImmediate);
+            console.log(`Campaign ${campaign.id} sent:`, result);
+          } catch (e) {
+            console.error('Immediate campaign send failed:', e);
+          }
+        })();
+      }
+
       res.status(201).json(campaign);
     } catch (error) {
       console.error("Campaign creation error:", error);
@@ -805,11 +1118,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Launch campaign now
+  app.post("/api/campaigns/:id/launch", isAuthenticated, hasOrganization, async (req, res) => {
+    try {
+  assertUser(req.user);
+      const campaignId = parseInt(req.params.id, 10);
+      const campaign = await storage.getCampaign(campaignId);
+      if (!campaign || campaign.organizationId !== req.user.organizationId) {
+        return res.status(404).json({ message: "Campaign not found" });
+      }
+
+      await storage.updateCampaign(campaignId, { status: 'Active' });
+      const result = await sendCampaignEmails(campaignId, req.user.organizationId);
+      return res.json({ message: 'Campaign launched', result });
+    } catch (error) {
+      console.error('Error launching campaign:', error);
+      return res.status(500).json({ message: 'Error launching campaign' });
+    }
+  });
+
   // Add or update these campaign routes
 
   // Get a specific campaign by ID
   app.get("/api/campaigns/:id", isAuthenticated, hasOrganization, async (req, res) => {
     try {
+  assertUser(req.user);
       const campaignId = parseInt(req.params.id, 10);
       const campaign = await storage.getCampaign(campaignId);
       
@@ -819,7 +1152,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Get related data
       const group = await storage.getGroup(campaign.targetGroupId);
-      const template = await storage.getEmailTemplate(campaign.emailTemplateId);
+  const template = await storage.getEmailTemplate(campaign.emailTemplateId);
       const landingPage = await storage.getLandingPage(campaign.landingPageId);
       const smtpProfile = await storage.getSmtpProfile(campaign.smtpProfileId);
       const targets = await storage.listTargets(campaign.targetGroupId);
@@ -835,7 +1168,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const enrichedCampaign = {
         ...campaign,
         targetGroup: group?.name,
-        emailTemplate: template ? { id: template.id, name: template.name } : null,
+  emailTemplate: template ? { id: (template as any).id, name: (template as any).name } : null,
         landingPage: landingPage ? { id: landingPage.id, name: landingPage.name } : null,
         smtpProfile: smtpProfile ? { id: smtpProfile.id, name: smtpProfile.name } : null,
         totalTargets: targets.length,
@@ -854,6 +1187,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Update a campaign
   app.put("/api/campaigns/:id", isAuthenticated, hasOrganization, async (req, res) => {
     try {
+  assertUser(req.user);
       const campaignId = parseInt(req.params.id, 10);
       const campaign = await storage.getCampaign(campaignId);
       
@@ -874,8 +1208,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid SMTP profile" });
       }
       
-      const emailTemplate = await storage.getEmailTemplate(Number(validatedData.emailTemplateId));
-      if (!emailTemplate || emailTemplate.organizationId !== req.user.organizationId) {
+  const emailTemplate = await storage.getEmailTemplate(Number(validatedData.emailTemplateId));
+  const emailTemplateOrgId2 = emailTemplate ? ((emailTemplate as any).organizationId ?? (emailTemplate as any).organization_id) : undefined;
+  if (!emailTemplate || emailTemplateOrgId2 !== req.user.organizationId) {
         return res.status(400).json({ message: "Invalid email template" });
       }
       
@@ -910,6 +1245,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Delete a campaign
   app.delete("/api/campaigns/:id", isAuthenticated, hasOrganization, async (req, res) => {
     try {
+  assertUser(req.user);
       const campaignId = parseInt(req.params.id, 10);
       const campaign = await storage.getCampaign(campaignId);
       
@@ -928,6 +1264,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get campaign results
   app.get("/api/campaigns/:id/results", isAuthenticated, hasOrganization, async (req, res) => {
     try {
+  assertUser(req.user);
       const campaignId = parseInt(req.params.id, 10);
       const campaign = await storage.getCampaign(campaignId);
       
@@ -964,6 +1301,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // User profile endpoints
   app.put("/api/user/profile", isAuthenticated, async (req, res) => {
     try {
+  assertUser(req.user);
       const allowedFields = ['firstName', 'lastName', 'position', 'bio'];
       const updateData: Partial<User> = {};
       
@@ -974,7 +1312,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      const updatedUser = await storage.updateUser(req.user.id, updateData);
+  const updatedUser = await storage.updateUser(req.user.id, updateData);
       
       if (!updatedUser) {
         return res.status(404).json({ message: "User not found" });
@@ -989,6 +1327,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   app.post("/api/user/change-password", isAuthenticated, async (req, res) => {
     try {
+  assertUser(req.user);
       const { currentPassword, newPassword } = req.body;
       
       if (!currentPassword || !newPassword) {
@@ -996,7 +1335,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Get the user with password (for verification)
-      const user = await storage.getUser(req.user.id);
+  const user = await storage.getUser(req.user.id);
       
       if (!user) {
         return res.status(404).json({ message: "User not found" });
@@ -1024,7 +1363,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const hashedPassword = await hashPassword(newPassword);
       
       // Update the user's password
-      const updatedUser = await storage.updateUser(req.user.id, { 
+  const updatedUser = await storage.updateUser(req.user.id, { 
         password: hashedPassword,
         failedLoginAttempts: 0,
         accountLocked: false,
@@ -1044,6 +1383,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   app.post("/api/user/profile-picture", isAuthenticated, upload.single('profilePicture'), async (req, res) => {
     try {
+  assertUser(req.user);
       if (!req.file) {
         return res.status(400).json({ message: "No file uploaded" });
       }
@@ -1052,7 +1392,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // In a production app, you might want to store the file elsewhere and just save the URL
       const profilePicture = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
       
-      const updatedUser = await storage.updateUser(req.user.id, { profilePicture });
+  const updatedUser = await storage.updateUser(req.user.id, { profilePicture });
       
       if (!updatedUser) {
         return res.status(404).json({ message: "User not found" });
@@ -1067,7 +1407,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   app.get("/api/users", isAuthenticated, hasOrganization, async (req, res) => {
     try {
-      const users = await db.select({
+  assertUser(req.user);
+      const userList = await db.select({
         id: users.id,
         firstName: users.firstName,
         lastName: users.lastName,
@@ -1082,7 +1423,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Get roles for each user
       const usersWithRoles = await Promise.all(
-        users.map(async (user) => {
+        userList.map(async (user) => {
           const userRoles = await db.select({
             id: rolesSchema.id,
             name: rolesSchema.name,
@@ -1109,6 +1450,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/users", isAuthenticated, hasOrganization, isAdmin, async (req, res) => {
     try {
+  assertUser(req.user);
       const { firstName, lastName, email, password, roleIds, isActive } = req.body;
       
       // Check if user already exists
@@ -1136,7 +1478,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Assign roles
       if (roleIds && roleIds.length > 0) {
-        const roleAssignments = roleIds.map(roleId => ({
+        const roleAssignments = (roleIds as number[]).map((roleId: number) => ({
           userId: newUser.id,
           roleId: roleId,
         }));
@@ -1161,6 +1503,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put("/api/users/:id", isAuthenticated, hasOrganization, isAdmin, async (req, res) => {
     try {
+  assertUser(req.user);
       const userId = parseInt(req.params.id);
       const { firstName, lastName, email, roleIds, isActive } = req.body;
       
@@ -1183,7 +1526,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Add new roles
         if (roleIds.length > 0) {
-          const roleAssignments = roleIds.map(roleId => ({
+          const roleAssignments = (roleIds as number[]).map((roleId: number) => ({
             userId: userId,
             roleId: roleId,
           }));
@@ -1201,6 +1544,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/users/:id", isAuthenticated, hasOrganization, isAdmin, async (req, res) => {
     try {
+  assertUser(req.user);
       const userId = parseInt(req.params.id);
       
       // Don't allow deleting self
@@ -1224,8 +1568,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Reports Export Endpoints
   app.post("/api/reports/export", isAuthenticated, hasOrganization, async (req, res) => {
     try {
-      const { type, dateRange, filters } = req.body;
-      
+      assertUser(req.user);
+      const { type, dateRange } = req.body;
+
       let reportData: any = {
         type,
         organizationName: req.user.organizationName,
@@ -1242,36 +1587,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
           gte(campaigns.createdAt, new Date(dateRange.start)),
           lte(campaigns.createdAt, new Date(dateRange.end))
         ) : eq(campaigns.organizationId, req.user.organizationId);
-      
-      switch (type) {
-        case 'campaigns':
-          const campaigns_data = await db.select().from(campaigns).where(dateFilter);
-          reportData.campaigns = campaigns_data;
-          break;
-        case 'users':
-          const users_data = await db.select().from(users).where(eq(users.organizationId, req.user.organizationId));
-          reportData.users = users_data;
-          break;
-        case 'results':
-          const results_data = await db.select().from(campaignResults)
-            .innerJoin(campaigns, eq(campaignResults.campaignId, campaigns.id))
-            .where(dateFilter);
-          reportData.results = results_data;
-          break;
-        case 'comprehensive':
-          const comp_campaigns = await db.select().from(campaigns).where(dateFilter);
-          const comp_users = await db.select().from(users).where(eq(users.organizationId, req.user.organizationId));
-          const comp_results = await db.select().from(campaignResults)
-            .innerJoin(campaigns, eq(campaignResults.campaignId, campaigns.id))
-            .where(dateFilter);
-          
-          reportData.campaigns = comp_campaigns;
-          reportData.users = comp_users;
-          reportData.results = comp_results;
-          break;
+
+      if (type === 'campaigns') {
+        const campaignsData = await db.select().from(campaigns).where(dateFilter);
+        reportData.campaigns = campaignsData;
+      } else if (type === 'users') {
+        const usersData = await db.select().from(users).where(eq(users.organizationId, req.user.organizationId));
+        reportData.users = usersData;
+      } else if (type === 'results') {
+        const resultsData = await db.select().from(campaignResults)
+          .innerJoin(campaigns, eq(campaignResults.campaignId, campaigns.id))
+          .where(dateFilter);
+        reportData.results = resultsData;
+      } else if (type === 'comprehensive') {
+        const compCampaigns = await db.select().from(campaigns).where(dateFilter);
+        const compUsers = await db.select().from(users).where(eq(users.organizationId, req.user.organizationId));
+        const compResults = await db.select().from(campaignResults)
+          .innerJoin(campaigns, eq(campaignResults.campaignId, campaigns.id))
+          .where(dateFilter);
+        reportData.campaigns = compCampaigns;
+        reportData.users = compUsers;
+        reportData.results = compResults;
       }
       
-      const filename = await exportReportToCsv(reportData);
+  const filename = await exportReportToCsv(reportData);
       
       res.json({ 
         success: true,
@@ -1315,6 +1654,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Notification Endpoints
   app.get("/api/notifications", isAuthenticated, async (req, res) => {
     try {
+  assertUser(req.user);
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 20;
       const offset = (page - 1) * limit;
@@ -1344,6 +1684,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/notifications/unread-count", isAuthenticated, async (req, res) => {
     try {
+  assertUser(req.user);
       const count = await NotificationService.getUnreadCount(req.user.id);
       res.json({ count });
     } catch (error) {
@@ -1354,14 +1695,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put("/api/notifications/:id/read", isAuthenticated, async (req, res) => {
     try {
+  assertUser(req.user);
       const notificationId = parseInt(req.params.id);
-      const notification = await NotificationService.markAsRead(notificationId, req.user.id);
-      
-      if (!notification) {
-        return res.status(404).json({ message: "Notification not found" });
-      }
-      
-      res.json(notification);
+  await NotificationService.markAsRead(notificationId, req.user.id);
+  res.json({ success: true });
     } catch (error) {
       console.error("Error marking notification as read:", error);
       res.status(500).json({ message: "Error marking notification as read" });
@@ -1370,6 +1707,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put("/api/notifications/mark-all-read", isAuthenticated, async (req, res) => {
     try {
+  assertUser(req.user);
       const notifications = await NotificationService.markAllAsRead(req.user.id);
       res.json({ updated: notifications.length });
     } catch (error) {
@@ -1380,6 +1718,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/notifications/:id", isAuthenticated, async (req, res) => {
     try {
+  assertUser(req.user);
       const notificationId = parseInt(req.params.id);
       await NotificationService.deleteNotification(notificationId, req.user.id);
       res.json({ message: "Notification deleted successfully" });
@@ -1392,6 +1731,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Notification Preferences
   app.get("/api/notifications/preferences", isAuthenticated, async (req, res) => {
     try {
+  assertUser(req.user);
       const preferences = await NotificationService.getPreferences(req.user.id);
       res.json(preferences);
     } catch (error) {
@@ -1402,6 +1742,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put("/api/notifications/preferences", isAuthenticated, async (req, res) => {
     try {
+  assertUser(req.user);
       const preferences = await NotificationService.updatePreferences(req.user.id, req.body);
       res.json(preferences);
     } catch (error) {
@@ -1413,6 +1754,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Admin endpoint to create notifications
   app.post("/api/notifications", isAuthenticated, isAdmin, async (req, res) => {
     try {
+  assertUser(req.user);
       const { type, title, message, priority, actionUrl, userIds, broadcast } = req.body;
       
       if (broadcast) {
@@ -1428,8 +1770,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.json({ message: "Broadcast notification sent", count: notifications.length });
       } else if (userIds && userIds.length > 0) {
         // Send to specific users
-        const notifications = [];
-        for (const userId of userIds) {
+        const notifications: any[] = [];
+        for (const userId of userIds as number[]) {
           const notification = await NotificationService.createNotification({
             userId,
             organizationId: req.user.organizationId,

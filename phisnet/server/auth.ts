@@ -6,7 +6,7 @@ import session from "express-session";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { storage } from "./storage";
-import { User as SelectUser, userValidationSchema } from "@shared/schema";
+import { User as SelectUser, userValidationSchema, forgotPasswordSchema, resetPasswordSchema } from "@shared/schema";
 import { sql } from "drizzle-orm";
 import { z } from "zod";
 import multer from "multer";
@@ -454,9 +454,9 @@ export function setupAuth(app: Express) {
       // Generate JWT token
       const token = generatePasswordResetToken(user);
       
-      // Store token in database with expiry
-      const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
-      await storage.createPasswordResetToken(user.id, token, expiresAt);
+  // Store token in database with expiry
+  const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+  await storage.createPasswordResetToken({ userId: user.id, token, expiresAt } as any);
       
       // Generate reset URL for the email
       const resetUrl = `${req.protocol}://${req.get('host')}/reset-password/${token}`;
@@ -521,8 +521,8 @@ export function setupAuth(app: Express) {
       const hashedPassword = await hashPassword(password);
       await storage.updateUser(user.id, { password: hashedPassword });
       
-      // Mark token as used
-      await storage.markPasswordResetTokenUsed(resetToken.id);
+  // Invalidate token after successful reset
+  await storage.deletePasswordResetToken(token);
       
       res.status(200).json({ message: "Password has been reset successfully" });
     } catch (error) {

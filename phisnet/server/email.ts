@@ -1,14 +1,15 @@
 import { MailService } from '@sendgrid/mail';
+import nodemailer from 'nodemailer';
+import { storage } from './storage';
 import jwt from 'jsonwebtoken';
 import { User } from '@shared/schema';
 
-// Configure SendGrid
-if (!process.env.SENDGRID_API_KEY) {
-  throw new Error("SENDGRID_API_KEY environment variable must be set");
-}
-
+// Configure SendGrid if available
+const SENDGRID_AVAILABLE = !!process.env.SENDGRID_API_KEY;
 const mailService = new MailService();
-mailService.setApiKey(process.env.SENDGRID_API_KEY);
+if (SENDGRID_AVAILABLE) {
+  mailService.setApiKey(process.env.SENDGRID_API_KEY as string);
+}
 
 // Email configuration
 const EMAIL_FROM = 'noreply@phishnet.io';
@@ -65,14 +66,8 @@ export function verifyPasswordResetToken(token: string): { userId: number; email
  */
 export async function sendPasswordResetEmail(user: User, resetUrl: string) {
   try {
-    const msg = {
-      to: user.email,
-      from: {
-        email: EMAIL_FROM,
-        name: EMAIL_NAME
-      },
-      subject: 'Reset Your PhishNet Password',
-      text: `
+    const subject = 'Reset Your PhishNet Password';
+    const text = `
         Hello ${user.firstName} ${user.lastName},
         
         You've requested to reset your password for your PhishNet account.
@@ -86,8 +81,8 @@ export async function sendPasswordResetEmail(user: User, resetUrl: string) {
         
         Thank you,
         PhishNet Security Team
-      `,
-      html: `
+      `;
+    const html = `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 5px;">
           <div style="text-align: center; margin-bottom: 20px;">
             <h2 style="color: #FF8000;">PhishNet Password Reset</h2>
@@ -113,12 +108,67 @@ export async function sendPasswordResetEmail(user: User, resetUrl: string) {
             <p>Thank you,<br>PhishNet Security Team</p>
           </div>
         </div>
-      `,
-    };
+      `;
 
-    await mailService.send(msg);
-    console.log('Password reset email sent to:', user.email);
-    return true;
+    if (SENDGRID_AVAILABLE) {
+      const msg = {
+        to: user.email,
+        from: { email: EMAIL_FROM, name: EMAIL_NAME },
+        subject,
+        text,
+        html,
+      } as any;
+      await mailService.send(msg);
+      console.log('Password reset email sent via SendGrid to:', user.email);
+      return true;
+    }
+
+    // Fallback to SMTP using first available SMTP profile in user's org or env
+    try {
+      let fromEmail = process.env.SMTP_FROM_EMAIL || EMAIL_FROM;
+      let fromName = process.env.SMTP_FROM_NAME || EMAIL_NAME;
+      let host = process.env.SMTP_HOST;
+      let port = process.env.SMTP_PORT ? parseInt(process.env.SMTP_PORT, 10) : undefined;
+      let username = process.env.SMTP_USERNAME;
+      let password = process.env.SMTP_PASSWORD;
+
+      if (!host || !port || !username || !password) {
+        // Try fetching an SMTP profile from the same organization
+        if ((user as any).organizationId) {
+          const profiles = await storage.listSmtpProfiles((user as any).organizationId);
+          if (profiles && profiles.length > 0) {
+            const p = profiles[0];
+            host = p.host; port = p.port; username = p.username; password = p.password;
+            fromEmail = p.fromEmail || fromEmail; fromName = p.fromName || fromName;
+          }
+        }
+      }
+
+      if (!host || !port || !username || !password) {
+        console.error('SMTP not configured and SendGrid unavailable');
+        return false;
+      }
+
+      const transporter = nodemailer.createTransport({
+        host,
+        port,
+        secure: port === 465,
+        auth: { user: username, pass: password },
+      });
+      try { await transporter.verify(); } catch {}
+      const info = await transporter.sendMail({
+        from: `${fromName} <${fromEmail}>`,
+        to: user.email,
+        subject,
+        text,
+        html,
+      });
+      console.log('Password reset email sent via SMTP to:', user.email, 'messageId:', (info as any).messageId);
+      return true;
+    } catch (smtpErr) {
+      console.error('SMTP fallback failed:', smtpErr);
+      return false;
+    }
   } catch (error) {
     console.error('Error sending password reset email:', error);
     return false;

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import AppLayout from "@/components/layout/app-layout";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -21,6 +22,8 @@ export default function LandingPagesPage() {
   const [isCreating, setIsCreating] = useState(false);
   const [selectedPage, setSelectedPage] = useState<any>(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
   
   const { data: landingPages } = useQuery({
     queryKey: ['/api/landing-pages'],
@@ -44,9 +47,53 @@ export default function LandingPagesPage() {
     window.open(`/api/landing-pages/${page.id}/preview`, '_blank');
   };
 
+  // Delete landing page
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await fetch(`/api/landing-pages/${id}`, { method: 'DELETE', credentials: 'include' });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || 'Failed to delete landing page');
+      }
+      return true;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/landing-pages'] });
+      toast({ title: 'Landing page deleted' });
+    },
+    onError: (e: any) => {
+      toast({ title: 'Delete failed', description: e.message, variant: 'destructive' });
+    }
+  });
+
+  // Clone landing page
+  const cloneMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await fetch(`/api/landing-pages/${id}/clone`, { method: 'POST', credentials: 'include' });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || 'Failed to clone landing page');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/landing-pages'] });
+      toast({ title: 'Landing page cloned' });
+    },
+    onError: (e: any) => {
+      toast({ title: 'Clone failed', description: e.message, variant: 'destructive' });
+    }
+  });
+
   // Filter pages by type for tab content
   const filterPagesByType = (type: string) => {
-    return landingPages?.filter(page => type === 'all' || page.pageType === type) || [];
+    const items = landingPages?.filter(page => type === 'all' || page.pageType === type) || [];
+    // Safety: ensure sorted by category (pageType) then name client-side as well
+    return [...items].sort((a: any, b: any) => {
+      const cat = (a.pageType || '').localeCompare(b.pageType || '');
+      if (cat !== 0) return cat;
+      return (a.name || '').localeCompare(b.name || '');
+    });
   };
 
   return (
@@ -129,10 +176,19 @@ export default function LandingPagesPage() {
                           <Button variant="ghost" size="icon" onClick={() => handleEdit(page)}>
                             <Edit className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="icon">
+                          <Button variant="ghost" size="icon" onClick={() => cloneMutation.mutate(page.id)} title="Clone">
                             <Copy className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="icon">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => {
+                              if (confirm(`Delete landing page "${page.name}"?`)) {
+                                deleteMutation.mutate(page.id);
+                              }
+                            }}
+                            title="Delete"
+                          >
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>

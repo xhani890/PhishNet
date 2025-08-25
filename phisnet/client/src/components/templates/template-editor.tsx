@@ -89,14 +89,19 @@ export default function TemplateEditor({ template, onClose }: TemplateEditorProp
   }, [isEditing, template]);
 
   const handleEditorChange = (content: string) => {
+    console.log("Editor content changed:", content);
     form.setValue("html_content", content);
+    // Also trigger form validation
+    form.trigger("html_content");
   };
 
   const handleEditorBlur = () => {
     if (sunEditorRef.current) {
       const content = sunEditorRef.current.getContents();
+      console.log("Editor blur - captured content:", content);
       if (content) {
         form.setValue("html_content", content);
+        form.trigger("html_content");
       }
     }
   };
@@ -115,8 +120,20 @@ export default function TemplateEditor({ template, onClose }: TemplateEditorProp
 
   const mutation = useMutation({
     mutationFn: async (data: TemplateFormValues) => {
+      // Manually capture content from editor before submission
+      if (sunEditorRef.current) {
+        const editorContent = sunEditorRef.current.getContents();
+        console.log("Manually captured editor content:", editorContent);
+        console.log("Original data.html_content:", data.html_content);
+        data.html_content = editorContent || data.html_content;
+        console.log("Updated data.html_content:", data.html_content);
+      }
+      
       // Create a log of what we're sending to the server
       console.log("Submitting template data:", data);
+      console.log("Full data object keys:", Object.keys(data));
+      console.log("Data html_content length:", data.html_content?.length);
+      console.log("Data JSON string:", JSON.stringify(data));
       
       const url = isEditing 
         ? `/api/email-templates/${template.id}` 

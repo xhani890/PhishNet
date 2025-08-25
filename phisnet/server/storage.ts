@@ -1,5 +1,4 @@
-﻿import { Pool } from 'pg';
-import { drizzle } from 'drizzle-orm/node-postgres';
+﻿// Removed unused imports
 import session from 'express-session';
 import ConnectPgSimple from 'connect-pg-simple';
 import { db, pool } from "./db"; // Add pool to this import
@@ -15,7 +14,7 @@ import {
   landingPages,
   passwordResetTokens
 } from "@shared/schema";
-import { eq, and, or, desc, asc, count, sql, gte, lte } from "drizzle-orm";
+import { eq, and, count, sql, gte } from "drizzle-orm";
 
 // Add missing type imports
 import type { 
@@ -111,6 +110,8 @@ export interface IStorage {
   updateCampaignResult(id: number, data: Partial<CampaignResult>): Promise<CampaignResult | undefined>;
   deleteCampaignResult(id: number): Promise<boolean>;
   listCampaignResults(campaignId: number): Promise<CampaignResult[]>;
+  // Update by composite key helper
+  updateCampaignResultByCampaignAndTarget(campaignId: number, targetId: number, data: Partial<CampaignResult>): Promise<CampaignResult | undefined>;
   
   // Password Reset Token methods
   createPasswordResetToken(token: InsertPasswordResetToken): Promise<PasswordResetToken>;
@@ -140,13 +141,75 @@ export class DatabaseStorage implements IStorage {
   
   // User methods
   async getUser(id: number): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.id, id));
-    return user;
+    // Use raw SQL and select only widely available columns to avoid schema drift issues (e.g., missing is_active)
+    const result = await pool.query(
+      `SELECT id, email, password, first_name, last_name, is_admin, organization_id, organization_name,
+              created_at, updated_at
+         FROM users
+        WHERE id = $1
+        LIMIT 1`,
+      [id]
+    );
+    if (result.rows.length === 0) return undefined;
+    const r = result.rows[0];
+    // Map to User shape with safe defaults for optional/newer fields
+    return {
+      id: r.id,
+      email: r.email,
+      password: r.password,
+      firstName: r.first_name,
+      lastName: r.last_name,
+      profilePicture: null,
+      position: null,
+      bio: null,
+      lastLogin: null,
+      failedLoginAttempts: 0,
+      lastFailedLogin: null,
+      accountLocked: false,
+      accountLockedUntil: null,
+      isActive: true,
+      isAdmin: r.is_admin ?? false,
+      organizationId: r.organization_id,
+      organizationName: r.organization_name ?? "None",
+      createdAt: r.created_at,
+      updatedAt: r.updated_at,
+    } as unknown as User;
   }
   
   async getUserByEmail(email: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.email, email));
-    return user;
+    // Use raw SQL and select only widely available columns to avoid schema drift issues (e.g., missing is_active)
+    const result = await pool.query(
+      `SELECT id, email, password, first_name, last_name, is_admin, organization_id, organization_name,
+              created_at, updated_at
+         FROM users
+        WHERE email = $1
+        LIMIT 1`,
+      [email]
+    );
+    if (result.rows.length === 0) return undefined;
+    const r = result.rows[0];
+    // Map to User shape with safe defaults for optional/newer fields
+    return {
+      id: r.id,
+      email: r.email,
+      password: r.password,
+      firstName: r.first_name,
+      lastName: r.last_name,
+      profilePicture: null,
+      position: null,
+      bio: null,
+      lastLogin: null,
+      failedLoginAttempts: 0,
+      lastFailedLogin: null,
+      accountLocked: false,
+      accountLockedUntil: null,
+      isActive: true,
+      isAdmin: r.is_admin ?? false,
+      organizationId: r.organization_id,
+      organizationName: r.organization_name ?? "None",
+      createdAt: r.created_at,
+      updatedAt: r.updated_at,
+    } as unknown as User;
   }
   
   async createUser(user: InsertUser): Promise<User> {
@@ -268,8 +331,8 @@ export class DatabaseStorage implements IStorage {
   
   async createTarget(organizationId: number, groupId: number, target: InsertTarget): Promise<Target> {
     const [newTarget] = await db.insert(targets).values({
-      firstName: target.firstName,
-      lastName: target.lastName,
+      firstName: (target as any).firstName && (target as any).firstName.trim().length > 0 ? (target as any).firstName : 'Recipient',
+      lastName: (target as any).lastName && (target as any).lastName.trim().length > 0 ? (target as any).lastName : 'User',
       email: target.email,
       position: target.position,
       groupId,
@@ -357,24 +420,24 @@ export class DatabaseStorage implements IStorage {
       const dbTemplate = result.rows[0];
       console.log(`Raw email template data from DB:`, dbTemplate);
       
-      // Map database fields to application model
+      // Map database fields to Drizzle model (snake_case keys)
       const template = {
         id: dbTemplate.id,
         name: dbTemplate.name,
         subject: dbTemplate.subject,
-        htmlContent: dbTemplate.html_content,
-        textContent: dbTemplate.text_content,
-        senderName: dbTemplate.sender_name,
-        senderEmail: dbTemplate.sender_email,
+        html_content: dbTemplate.html_content,
+        text_content: dbTemplate.text_content,
+        sender_name: dbTemplate.sender_name,
+        sender_email: dbTemplate.sender_email,
         type: dbTemplate.type,
         complexity: dbTemplate.complexity,
         description: dbTemplate.description,
         category: dbTemplate.category,
-        organizationId: dbTemplate.organization_id,
-        createdById: dbTemplate.created_by_id,
-        createdAt: dbTemplate.created_at,
-        updatedAt: dbTemplate.updated_at,
-      };
+        organization_id: dbTemplate.organization_id,
+        created_by_id: dbTemplate.created_by_id,
+        created_at: dbTemplate.created_at,
+        updated_at: dbTemplate.updated_at,
+      } as EmailTemplate;
       
       console.log(`Mapped email template data:`, template);
       return template;
@@ -388,16 +451,16 @@ export class DatabaseStorage implements IStorage {
     const [newTemplate] = await db.insert(emailTemplates).values({
       name: template.name,
       subject: template.subject,
-      htmlContent: template.htmlContent,
-      textContent: template.textContent,
-      senderName: template.senderName,
-      senderEmail: template.senderEmail,
+      html_content: template.html_content,
+      text_content: template.text_content,
+      sender_name: template.sender_name,
+      sender_email: template.sender_email,
       type: template.type,
       complexity: template.complexity,
       description: template.description,
       category: template.category,
-      organizationId,
-      createdById: userId,
+      organization_id: organizationId,
+      created_by_id: userId,
     }).returning();
     return newTemplate;
   }
@@ -405,8 +468,8 @@ export class DatabaseStorage implements IStorage {
   async updateEmailTemplate(id: number, data: Partial<EmailTemplate>): Promise<EmailTemplate | undefined> {
     const [updatedTemplate] = await db.update(emailTemplates)
       .set({
-        ...data,
-        updatedAt: new Date(),
+  ...data,
+  updated_at: new Date(),
       })
       .where(eq(emailTemplates.id, id))
       .returning();
@@ -463,6 +526,8 @@ export class DatabaseStorage implements IStorage {
       redirectUrl: page.redirectUrl,
       pageType: page.pageType,
       thumbnail: page.thumbnail,
+  captureData: (page as any).captureData ?? true,
+  capturePasswords: (page as any).capturePasswords ?? false,
       organizationId,
       createdById: userId,
     }).returning();
@@ -486,7 +551,12 @@ export class DatabaseStorage implements IStorage {
   }
   
   async listLandingPages(organizationId: number): Promise<LandingPage[]> {
-    return await db.select().from(landingPages).where(eq(landingPages.organizationId, organizationId));
+    // Order by pageType (acts as category) then name for stable grouping
+    return await db
+      .select()
+      .from(landingPages)
+      .where(eq(landingPages.organizationId, organizationId))
+      .orderBy(landingPages.pageType, landingPages.name);
   }
   
   // Campaign methods
@@ -518,7 +588,7 @@ export class DatabaseStorage implements IStorage {
       landingPageId: campaign.landingPageId,
       scheduledAt: campaign.scheduledAt,
       endDate: campaign.endDate,
-      status: "Draft",
+  status: campaign.scheduledAt ? "Scheduled" : "Draft",
       organizationId,
       createdById: userId,
     }).returning();
@@ -552,7 +622,11 @@ export class DatabaseStorage implements IStorage {
   }
   
   async createCampaignResult(result: InsertCampaignResult): Promise<CampaignResult> {
-    const [newResult] = await db.insert(campaignResults).values(result).returning();
+    const [newResult] = await db.insert(campaignResults).values({
+      ...result,
+      // Ensure organizationId is present for integrity
+      organizationId: (result as any).organizationId ?? undefined,
+    }).returning();
     return newResult;
   }
   
@@ -567,6 +641,17 @@ export class DatabaseStorage implements IStorage {
     return updatedResult;
   }
   
+  async updateCampaignResultByCampaignAndTarget(campaignId: number, targetId: number, data: Partial<CampaignResult>): Promise<CampaignResult | undefined> {
+    const [updated] = await db.update(campaignResults)
+      .set({
+        ...data,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(campaignResults.campaignId, campaignId), eq(campaignResults.targetId, targetId)))
+      .returning();
+    return updated;
+  }
+
   async deleteCampaignResult(id: number): Promise<boolean> {
     await db.delete(campaignResults).where(eq(campaignResults.id, id));
     return true;
@@ -578,7 +663,16 @@ export class DatabaseStorage implements IStorage {
   
   // Password Reset Token methods
   async createPasswordResetToken(token: InsertPasswordResetToken): Promise<PasswordResetToken> {
-    const [newToken] = await db.insert(passwordResetTokens).values(token).returning();
+  console.log('[PasswordReset] createPasswordResetToken input:', token);
+  // Ensure all fields are present
+  const record = {
+      token: (token as any).token,
+      userId: (token as any).userId,
+      expiresAt: (token as any).expiresAt,
+      createdAt: new Date(),
+    } as InsertPasswordResetToken;
+  console.log('[PasswordReset] normalized record for insert:', record);
+    const [newToken] = await db.insert(passwordResetTokens).values(record).returning();
     return newToken;
   }
   
@@ -721,13 +815,18 @@ export class DatabaseStorage implements IStorage {
       .orderBy(sql`count(CASE WHEN ${campaignResults.status} IN ('clicked', 'submitted') THEN 1 END) DESC`)
       .limit(10);
       
-      return riskUsers.map(user => ({
-        id: user.targetId,
-        name: `${user.firstName} ${user.lastName}`,
-        department: user.department || 'Unknown',
-        riskLevel: user.riskScore >= 3 ? 'High Risk' : user.riskScore >= 2 ? 'Medium Risk' : 'Low Risk',
-        riskScore: user.riskScore,
-      }));
+      return riskUsers.map(user => {
+        let riskLevel: 'High Risk' | 'Medium Risk' | 'Low Risk' = 'Low Risk';
+        if (user.riskScore >= 3) riskLevel = 'High Risk';
+        else if (user.riskScore >= 2) riskLevel = 'Medium Risk';
+        return {
+          id: user.targetId,
+          name: `${user.firstName} ${user.lastName}`,
+          department: user.department || 'Unknown',
+          riskLevel,
+          riskScore: user.riskScore,
+        };
+      });
     } catch (error) {
       console.error("Error getting at-risk users:", error);
       return [];

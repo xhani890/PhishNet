@@ -1,12 +1,28 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
-import { isAuthenticated, hasOrganization, isAdmin } from './auth';
+import { isAuthenticated, isAdmin } from './auth';
 import { pool } from './db';
+import { startCampaignScheduler } from './services/campaign-scheduler';
 
 const app = express();
+
+// Add CORS middleware
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', 'http://localhost:5173');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cookie');
+  
+  if (req.method === 'OPTIONS') {
+    res.sendStatus(200);
+  } else {
+    next();
+  }
+});
+
 app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
+app.use(express.urlencoded({ extended: true }));
 
 app.use((req, res, next) => {
   const start = Date.now();
@@ -58,6 +74,9 @@ app.use((req, res, next) => {
   const port = 5000;
   server.listen(port, "localhost", () => {
     log(`Server running at http://localhost:${port}`);
+  // Start background scheduler to auto-send due campaigns
+  const intervalMs = parseInt(process.env.CAMPAIGN_SCHEDULER_INTERVAL_MS || '60000', 10);
+  startCampaignScheduler(intervalMs);
   });
 })();
 

@@ -70,13 +70,13 @@ function RecentNotifications() {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        {notifications.length === 0 ? (
+        {(!notifications || !Array.isArray(notifications) || notifications.length === 0) ? (
           <p className="text-sm text-muted-foreground text-center py-4">
             No recent notifications
           </p>
         ) : (
           <div className="space-y-3">
-            {notifications.slice(0, 5).map((notification: Notification) => (
+            {(Array.isArray(notifications) ? notifications : []).slice(0, 5).map((notification: Notification) => (
               <div key={notification.id} className="flex items-start gap-3">
                 {getIconForType(notification.type, notification.priority)}
                 <div className="flex-1 min-w-0">

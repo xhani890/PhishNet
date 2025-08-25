@@ -53,6 +53,11 @@ export default function GroupsPage() {
   const { data: targets, refetch: refetchTargets } = useQuery({
     queryKey: ['/api/groups', selectedGroup?.id, 'targets'],
     enabled: !!selectedGroup,
+    queryFn: async () => {
+      if (!selectedGroup?.id) return [];
+      const res = await apiRequest('GET', `/api/groups/${selectedGroup.id}/targets`);
+      return await res.json();
+    },
     onSuccess: (data) => {
       console.log('Targets data:', data);
       if (data && data.length > 0) {

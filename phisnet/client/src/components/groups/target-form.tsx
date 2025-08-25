@@ -10,8 +10,8 @@ import { apiRequest } from "@/lib/queryClient";
 import { Loader2 } from "lucide-react";
 
 const targetSchema = z.object({
-  firstName: z.string().min(1, "First name is required"),
-  lastName: z.string().min(1, "Last name is required"),
+  firstName: z.string().optional(),
+  lastName: z.string().optional(),
   email: z.string().email("Please enter a valid email address"),
   position: z.string().optional(),
 });
@@ -85,7 +85,7 @@ export default function TargetForm({ groupId, target, onClose }: TargetFormProps
             name="firstName"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>First Name</FormLabel>
+                <FormLabel>First Name (optional)</FormLabel>
                 <FormControl>
                   <Input placeholder="John" {...field} />
                 </FormControl>
@@ -99,7 +99,7 @@ export default function TargetForm({ groupId, target, onClose }: TargetFormProps
             name="lastName"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Last Name</FormLabel>
+                <FormLabel>Last Name (optional)</FormLabel>
                 <FormControl>
                   <Input placeholder="Smith" {...field} />
                 </FormControl>
