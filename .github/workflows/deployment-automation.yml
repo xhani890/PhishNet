@@ -23,7 +23,7 @@ on:
         type: boolean
 
 env:
-  NODE_VERSION: '18'
+  NODE_VERSION: '20'
 
 permissions:
   contents: read
@@ -172,19 +172,23 @@ jobs:
       run: |
         echo "## 🚀 Deployment Summary" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
-        
+
         if [ "${{ needs.deploy-staging.result }}" == "success" ]; then
           echo "✅ **Staging Deployment:** SUCCESS" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ **Staging Deployment:** ${{ needs.deploy-staging.result }}" >> $GITHUB_STEP_SUMMARY
         fi
-        
+
         if [ "${{ needs.deploy-production.result }}" == "success" ]; then
           echo "✅ **Production Deployment:** SUCCESS" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ **Production Deployment:** ${{ needs.deploy-production.result }}" >> $GITHUB_STEP_SUMMARY
         fi
-        
-  echo "" >> $GITHUB_STEP_SUMMARY
-  echo "**Version:** ${{ needs.build.outputs.version }}" >> $GITHUB_STEP_SUMMARY
-  echo "**Deployed by:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
-  echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Version:** ${{ needs.build.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Deployed by:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
         
     - name: Notify deployment completion
       run: |

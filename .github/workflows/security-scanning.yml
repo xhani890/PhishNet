@@ -22,7 +22,7 @@ on:
   # container option removed
 
 env:
-  NODE_VERSION: '18'
+  NODE_VERSION: '20'
   PYTHON_VERSION: '3.11'
 
 permissions:
@@ -50,7 +50,8 @@ jobs:
         
     - name: Install dependencies
       working-directory: ./phisnet
-      run: npm ci
+      run: |
+        npm ci || (echo 'First npm ci failed, retrying after clean...' && npm cache clean --force && npm ci)
       
     - name: Run npm audit
       working-directory: ./phisnet
@@ -73,7 +74,8 @@ jobs:
           echo "vulnerability-status=acceptable" >> $GITHUB_OUTPUT
         fi
         
-    - name: Snyk security scan
+    - name: Snyk security scan (optional if token present)
+      if: ${{ secrets.SNYK_TOKEN != '' }}
       uses: snyk/actions/node@master
       continue-on-error: true
       env:
@@ -115,7 +117,8 @@ jobs:
         
     - name: Install dependencies
       working-directory: ./phisnet
-      run: npm ci
+      run: |
+        npm ci || (echo 'First npm ci failed, retrying after clean...' && npm cache clean --force && npm ci)
       
     - name: Clean dependency install for build
       working-directory: ./phisnet
@@ -233,25 +236,23 @@ jobs:
       run: |
         echo "## 🔒 Security Scan Summary" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
-        
-        # Check results from each scan
+
         if [ "${{ needs.dependency-scan.result }}" == "success" ]; then
           echo "✅ **Dependency Scan:** PASSED" >> $GITHUB_STEP_SUMMARY
         else
           echo "❌ **Dependency Scan:** FAILED" >> $GITHUB_STEP_SUMMARY
         fi
-        
+
         if [ "${{ needs.code-security-scan.result }}" == "success" ]; then
           echo "✅ **Code Security Scan:** PASSED" >> $GITHUB_STEP_SUMMARY
         else
           echo "❌ **Code Security Scan:** FAILED" >> $GITHUB_STEP_SUMMARY
         fi
-        
-  # Container security scan removed (Aug 2025)
-  echo "" >> $GITHUB_STEP_SUMMARY
-  echo "**Scan Triggered By:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
-  echo "**Scan Type:** ${{ inputs.scan_type || 'full' }}" >> $GITHUB_STEP_SUMMARY
-  echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Scan Triggered By:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Scan Type:** ${{ inputs.scan_type || 'full' }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
         
     - name: Create security issue
       if: ${{ needs.dependency-scan.result == 'failure' || needs.code-security-scan.result == 'failure' }}
