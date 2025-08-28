@@ -1428,7 +1428,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   app.get("/api/users", isAuthenticated, hasOrganization, async (req, res) => {
     try {
-  assertUser(req.user);
+      assertUser(req.user);
+      // Ensure default roles are seeded (so users list always has roles available)
+      try {
+        const existingRole = await db.select({ id: rolesSchema.id }).from(rolesSchema).limit(1);
+        if (existingRole.length === 0) {
+          for (const r of DEFAULT_ROLES) {
+            try {
+              await db.insert(rolesSchema).values({
+                name: r.name,
+                description: r.description,
+                permissions: { permissions: r.permissions }
+              } as any);
+            } catch {}
+          }
+        }
+      } catch (e) {
+        console.error('Role seeding check failed:', e);
+      }
+
       const userList = await db.select({
         id: users.id,
         firstName: users.firstName,
@@ -1438,14 +1456,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         lastLogin: users.lastLogin,
         profilePicture: users.profilePicture,
         createdAt: users.createdAt,
+        isAdmin: users.isAdmin,
       })
       .from(users)
       .where(eq(users.organizationId, req.user.organizationId));
       
-      // Get roles for each user
+      // Get roles for each user, auto-assign Admin if needed
       const usersWithRoles = await Promise.all(
         userList.map(async (user) => {
-          const userRoles = await db.select({
+          let userRoles = await db.select({
             id: rolesSchema.id,
             name: rolesSchema.name,
             description: rolesSchema.description,
@@ -1454,6 +1473,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .from(userRolesSchema)
           .innerJoin(rolesSchema, eq(userRolesSchema.roleId, rolesSchema.id))
           .where(eq(userRolesSchema.userId, user.id));
+
+          if (userRoles.length === 0 && user.isAdmin) {
+            // Auto-assign Admin role if missing
+            const [adminRole] = await db.select({ id: rolesSchema.id, name: rolesSchema.name, description: rolesSchema.description, permissions: rolesSchema.permissions })
+              .from(rolesSchema)
+              .where(eq(rolesSchema.name, 'Admin'));
+            if (adminRole) {
+              try {
+                await db.insert(userRolesSchema).values({ userId: user.id, roleId: adminRole.id });
+                userRoles.push(adminRole);
+              } catch (e) {
+                // Ignore duplicates racing
+              }
+            }
+          }
           
           return {
             ...user,

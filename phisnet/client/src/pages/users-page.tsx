@@ -45,7 +45,7 @@ const userFormSchema = z.object({
   lastName: z.string().min(1, "Last name is required"),
   email: z.string().email("Please enter a valid email address"),
   password: z.string().min(8, "Password must be at least 8 characters").optional(),
-  roleIds: z.array(z.number()).min(1, "At least one role is required"),
+  roleId: z.number({ required_error: "Role is required" }),
   isActive: z.boolean().default(true),
 });
 
@@ -86,7 +86,7 @@ export default function UsersPage() {
       lastName: "",
       email: "",
       password: "",
-      roleIds: [],
+      roleId: undefined as any,
       isActive: true,
     },
   });
@@ -166,7 +166,7 @@ export default function UsersPage() {
       firstName: user.firstName,
       lastName: user.lastName,
       email: user.email,
-      roleIds: user.roles?.map((r: any) => r.id) || [],
+      roleId: user.roles?.[0]?.id,
       isActive: user.isActive,
     });
     setIsCreating(true);
@@ -258,9 +258,6 @@ export default function UsersPage() {
                         </Avatar>
                         <div>
                           <p className="font-medium">{user.firstName} {user.lastName}</p>
-                          <p className="text-sm text-muted-foreground">
-                            ID: {user.id}
-                          </p>
                         </div>
                       </div>
                     </TableCell>
@@ -402,39 +399,24 @@ export default function UsersPage() {
               {canManageRoles && (
                 <FormField
                   control={form.control}
-                  name="roleIds"
+                  name="roleId"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Roles</FormLabel>
-                      <div className="space-y-2">
-                        {roles?.map((role) => (
-                          <div key={role.id} className="flex items-center space-x-2">
-                            <Checkbox
-                              id={`role-${role.id}`}
-                              checked={field.value.includes(role.id)}
-                              onCheckedChange={(checked) => {
-                                const value = field.value || [];
-                                if (checked) {
-                                  field.onChange([...value, role.id]);
-                                } else {
-                                  field.onChange(value.filter(id => id !== role.id));
-                                }
-                              }}
-                            />
-                            <label htmlFor={`role-${role.id}`} className="flex items-center space-x-2">
-                              <Badge 
-                                variant="secondary"
-                                className={`${getRoleColor(role.name)} text-white`}
-                              >
-                                {role.name}
-                              </Badge>
-                              <span className="text-sm text-muted-foreground">
-                                {role.description}
-                              </span>
-                            </label>
-                          </div>
-                        ))}
-                      </div>
+                      <FormLabel>Role</FormLabel>
+                      <Select onValueChange={value => field.onChange(Number(value))} value={field.value ? String(field.value) : undefined}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select role" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {roles?.map((role) => (
+                            <SelectItem key={role.id} value={String(role.id)}>
+                              {role.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                       <FormMessage />
                     </FormItem>
                   )}
