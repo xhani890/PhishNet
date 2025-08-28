@@ -16,7 +16,8 @@ import {
   insertEmailTemplateSchema, 
   insertLandingPageSchema, 
   insertCampaignSchema,
-  type User
+  type User,
+  DEFAULT_ROLES
 } from "@shared/schema";
 import { eq, and, sql, gte, lte } from "drizzle-orm";
 import multer from "multer";
@@ -32,6 +33,26 @@ import { sendCampaignEmails } from './services/email-service';
 const upload = multer();
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Ensure role tables exist (auto-migration safety net)
+  try {
+    await db.execute(sql`CREATE TABLE IF NOT EXISTS roles (
+      id SERIAL PRIMARY KEY,
+      name VARCHAR(50) NOT NULL UNIQUE,
+      description VARCHAR(200),
+      permissions JSONB NOT NULL DEFAULT '{}' ,
+      created_at TIMESTAMP DEFAULT NOW(),
+      updated_at TIMESTAMP DEFAULT NOW()
+    );`);
+    await db.execute(sql`CREATE TABLE IF NOT EXISTS user_roles (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      role_id INTEGER REFERENCES roles(id) ON DELETE CASCADE,
+      created_at TIMESTAMP DEFAULT NOW()
+    );`);
+  } catch (e) {
+    console.error('Auto-migration (roles tables) failed:', e);
+  }
+
   // Setup authentication
   setupAuth(app);
 
@@ -1451,7 +1472,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/users", isAuthenticated, hasOrganization, isAdmin, async (req, res) => {
     try {
   assertUser(req.user);
-      const { firstName, lastName, email, password, roleIds, isActive } = req.body;
+      const { firstName, lastName, email, password, roleId, isActive } = req.body;
       
       // Check if user already exists
       const existingUser = await db.select()
@@ -1477,13 +1498,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }).returning();
       
       // Assign roles
-      if (roleIds && roleIds.length > 0) {
-        const roleAssignments = (roleIds as number[]).map((roleId: number) => ({
-          userId: newUser.id,
-          roleId: roleId,
-        }));
-        
-        await db.insert(userRolesSchema).values(roleAssignments);
+      if (roleId) {
+        await db.insert(userRolesSchema).values({ userId: newUser.id, roleId: Number(roleId) });
       }
       
       res.status(201).json({ 
@@ -1505,7 +1521,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
   assertUser(req.user);
       const userId = parseInt(req.params.id);
-      const { firstName, lastName, email, roleIds, isActive } = req.body;
+      const { firstName, lastName, email, roleId, isActive } = req.body;
       
       // Update user
       const [updatedUser] = await db.update(users)
@@ -1520,19 +1536,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .returning();
       
       // Update roles
-      if (roleIds) {
+      if (roleId) {
         // Remove existing roles
         await db.delete(userRolesSchema).where(eq(userRolesSchema.userId, userId));
         
         // Add new roles
-        if (roleIds.length > 0) {
-          const roleAssignments = (roleIds as number[]).map((roleId: number) => ({
-            userId: userId,
-            roleId: roleId,
-          }));
-          
-          await db.insert(userRolesSchema).values(roleAssignments);
-        }
+        await db.insert(userRolesSchema).values({ userId, roleId: Number(roleId) });
       }
       
       res.json({ message: "User updated successfully", user: updatedUser });
@@ -1810,6 +1819,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ message: "Error history cleared" });
     } catch (error) {
       res.status(500).json({ message: "Error clearing error history" });
+    }
+  });
+
+  // Roles listing endpoint
+  app.get("/api/roles", isAuthenticated, hasOrganization, async (req, res) => {
+    try {
+      assertUser(req.user);
+      let roles = await db.select({
+        id: rolesSchema.id,
+        name: rolesSchema.name,
+        description: rolesSchema.description,
+        permissions: rolesSchema.permissions,
+      }).from(rolesSchema);
+
+      if (!roles || roles.length === 0) {
+        // Seed default roles if table empty
+        for (const r of DEFAULT_ROLES) {
+          try {
+            await db.insert(rolesSchema).values({
+              name: r.name,
+              description: r.description,
+              permissions: { permissions: r.permissions }
+            } as any);
+          } catch (e) {
+            // Ignore duplicates
+          }
+        }
+        roles = await db.select({
+          id: rolesSchema.id,
+          name: rolesSchema.name,
+          description: rolesSchema.description,
+          permissions: rolesSchema.permissions,
+        }).from(rolesSchema);
+      }
+
+      res.json(roles);
+    } catch (error) {
+      console.error("Error fetching roles:", error);
+      res.status(500).json({ message: "Error fetching roles" });
     }
   });
 
