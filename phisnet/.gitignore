@@ -112,7 +112,22 @@ ai-generated/
 *.7z
 *.rar
 PhishNet-Package-*/
-Exported-DB/
+# Database export artifacts: keep directory + scripts/docs, ignore large dump files
+Exported-DB/*.dump
+Exported-DB/*_schema_*.sql
+Exported-DB/*_data_*.sql
+Exported-DB/*_globals_*.sql
+Exported-DB/*_schema_data_*.zip
+Exported-DB/*_plain_*.sql
+Exported-DB/*_manifest_*.sha256
+
+# Allow helper scripts & docs
+!Exported-DB/README-RESTORE.md
+!Exported-DB/VERIFY-RESTORE.md
+!Exported-DB/backup-windows.ps1
+!Exported-DB/backup-linux.sh
+!Exported-DB/restore-windows.ps1
+!Exported-DB/restore-linux.sh
 
 # OS generated files
 .DS_Store
