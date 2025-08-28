@@ -1,0 +1,2 @@
+-- Schema snapshot placeholder. CI workflow will regenerate this file with the current database schema.
+-- Generated: 2025-08-28T00:00:00Z
