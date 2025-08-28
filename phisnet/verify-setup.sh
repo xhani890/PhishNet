@@ -109,21 +109,7 @@ else
     ((WARNINGS++))
 fi
 
-# Check Docker (optional)
-info "Checking Docker installation..."
-if command -v docker >/dev/null 2>&1; then
-    DOCKER_VERSION=$(docker --version)
-    success "Docker installed: $DOCKER_VERSION"
-    
-    if docker ps >/dev/null 2>&1; then
-        success "Docker service is running"
-    else
-        warning "Docker service not running or permission issues"
-        ((WARNINGS++))
-    fi
-else
-    info "Docker not found (optional deployment method)"
-fi
+# (legacy container check removed)
 
 # Check project files
 info "Checking PhishNet project files..."

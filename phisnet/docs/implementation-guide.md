@@ -35,29 +35,13 @@ git commit -m "feat: implement modular access DevOps strategy
 git push origin main
 ```
 
-### **Phase 2: Create Specialized Codespace Templates (10 minutes)**
+### **Phase 2: Environment Setup (Unified Native Workflow)**
 
-#### 2.1 Test Frontend Workspace
+Use the unified native Node.js setup (all former container/Codespaces templates removed Aug 2025):
 ```bash
-# 1. Go to GitHub repository in browser
-# 2. Click "Code" dropdown
-# 3. Select "Codespaces" tab
-# 4. Click "Configure dev container"
-# 5. Choose "frontend.devcontainer.json"
-# 6. Create Codespace
-
-# Expected result:
-# - Only client/ and shared/types/ folders visible
-# - Full PhishNet app accessible via port forwarding
-# - VS Code configured for frontend development
-```
-
-#### 2.2 Test Backend Workspace  
-```bash
-# 1. Create new Codespace
-# 2. Choose "backend.devcontainer.json"
-# 3. Verify only server/ and shared/ accessible
-# 4. Confirm full app testing capability
+# Standard local (or remote VM) developer flow:
+npm install
+npm run dev   # runs full stack
 ```
 
 ### **Phase 3: Team Setup (20 minutes)**
@@ -113,33 +97,17 @@ cat CODEOWNERS
 ### **Phase 5: Developer Onboarding (10 minutes per developer)**
 
 #### 5.1 Frontend Developer Setup
+Use native environment: clone/pull authorized subset and run:
 ```bash
-# Send to frontend developers:
-# 1. Go to: https://github.com/gh0st-bit/PhishNet
-# 2. Click: Code > Codespaces > Create codespace on main
-# 3. Choose: frontend.devcontainer.json
-# 4. Wait for environment setup (2-3 minutes)
-# 5. Run: npm run validate:frontend
-# 6. Start development: npm run frontend:dev
-
-# They will see:
-# - Only client/ folder for editing
-# - Full PhishNet app running on port 3000
-# - Backend API accessible but code not visible
+npm install
+npm run frontend:dev
 ```
 
 #### 5.2 Backend Developer Setup
+Run locally:
 ```bash
-# Send to backend developers:
-# 1. Create Codespace with backend.devcontainer.json
-# 2. Run: npm run validate:backend  
-# 3. Start development: npm run backend:dev
-# 4. Test API with: npm run app:preview
-
-# They will see:
-# - Only server/ and shared/ folders for editing
-# - Full app for testing API changes
-# - Frontend UI accessible but code not visible
+npm install
+npm run backend:dev
 ```
 
 ## 🔧 **Quick Implementation Commands**
@@ -212,11 +180,7 @@ git push origin main
 
 ### **Common Issues:**
 
-**Issue: Codespace won't start**
-```bash
-# Solution: Check Dockerfile syntax
-# Run: docker build -f .devcontainer/frontend.Dockerfile .
-```
+<!-- Legacy Codespace container start issue removed after de-containerization -->
 
 **Issue: Workspace validation fails**
 ```bash

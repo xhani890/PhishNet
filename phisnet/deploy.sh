@@ -1,6 +1,7 @@
 #!/bin/bash
 # 🎣 PhishNet Universal Linux/macOS Deployment
 # Auto-detects environment and installs all dependencies
+# Native-only deployment script (containers removed)
 
 set -e
 
@@ -44,7 +45,7 @@ echo -e "${BLUE}🎣 PhishNet Universal Deployment 🎣${NC}"
 echo -e "${BLUE}======================================${NC}"
 echo -e "${BLUE}🚀 Auto-installs all dependencies${NC}"
 echo -e "${BLUE}🔧 Configures services automatically${NC}"
-echo -e "${BLUE}🐳 Includes Docker support${NC}"
+echo -e "${BLUE}Environment: native services (PostgreSQL, Redis, Node.js)${NC}"
 echo -e "${BLUE}======================================${NC}"
 echo ""
 
@@ -62,7 +63,7 @@ auto_chmod() {
     local scripts=(
         "deploy.sh"
         "start.sh" 
-        "kali-docker-fix.sh"
+    # legacy container fix script removed
         "kali-redis-fix.sh"
         "reset-db.sh"
         "check-deps.sh"
@@ -129,134 +130,7 @@ check_permissions() {
     return 0
 }
 
-# Comprehensive Kali Linux fixes
-run_kali_fixes() {
-    info "🚨 Running comprehensive Kali Linux fixes..."
-    
-    # 1. Fix Docker Compose segfault
-    info "🔧 Step 1: Fixing Docker Compose segfault..."
-    sudo apt-get remove -y docker-compose 2>/dev/null || true
-    
-    # Install pipx for isolated packages
-    if ! command -v pipx >/dev/null 2>&1; then
-        info "Installing pipx for isolated Python packages..."
-        sudo apt-get install -y pipx python3-venv
-    fi
-    
-    # Install docker-compose via pipx
-    if pipx install docker-compose 2>/dev/null; then
-        success "Docker Compose installed via pipx"
-        export PATH="$HOME/.local/bin:$PATH"
-        echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc 2>/dev/null || true
-        echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc 2>/dev/null || true
-    else
-        warning "pipx failed, using pip with --break-system-packages..."
-        sudo pip3 install docker-compose --break-system-packages 2>/dev/null || true
-    fi
-    
-    # 2. Fix Docker permissions
-    info "🔧 Step 2: Fixing Docker permissions..."
-    if ! groups | grep -q docker; then
-        sudo usermod -aG docker "$USER"
-        success "Added to docker group"
-    fi
-    
-    # Fix Docker socket permissions temporarily
-    sudo chmod 666 /var/run/docker.sock 2>/dev/null || true
-    
-    # Start Docker service if not running
-    if ! systemctl is-active --quiet docker; then
-        sudo systemctl start docker
-        sleep 2
-    fi
-    
-    # Test Docker access immediately
-    if docker ps >/dev/null 2>&1; then
-        success "Docker permissions working immediately"
-    else
-        warning "Docker permissions need group refresh - will work after 'newgrp docker'"
-        # Try to fix socket permissions more aggressively
-        sudo chmod 777 /var/run/docker.sock 2>/dev/null || true
-    fi
-    
-    success "Docker socket permissions fixed"
-    
-    # 3. Ensure Docker daemon is running
-    info "🔧 Step 3: Starting Docker daemon..."
-    sudo systemctl start docker 2>/dev/null || true
-    sudo systemctl enable docker 2>/dev/null || true
-    success "Docker daemon started"
-    
-    # 4. Fix Dockerfile Alpine package issue
-    if [[ -f "Dockerfile" ]] && grep -q "redis-tools" Dockerfile; then
-        info "🔧 Step 4: Fixing Dockerfile Alpine package issue..."
-        sed -i 's/redis-tools/redis/g' Dockerfile
-        success "Dockerfile fixed (redis-tools → redis)"
-    fi
-    
-    # Fix Dockerfile npm ci issue
-    if [[ -f "Dockerfile" ]] && grep -q "npm ci --only=production" Dockerfile; then
-        info "🔧 Fixing Dockerfile npm ci issue..."
-        sed -i 's/npm ci --only=production --ignore-scripts/npm install --production --ignore-scripts || npm install --ignore-scripts/g' Dockerfile
-        success "Dockerfile npm command fixed"
-    fi
-    
-    # 5. Fix docker-compose.yml version warning
-    if [[ -f "docker-compose.yml" ]] && grep -q "version:" docker-compose.yml; then
-        info "🔧 Step 5: Fixing docker-compose.yml version warning..."
-        sed -i '/^version:/d' docker-compose.yml
-        success "docker-compose.yml version attribute removed"
-    fi
-    
-    # 5. Test fixes
-    info "🔍 Step 6: Testing fixes..."
-    
-    # Test Docker
-    if docker --version >/dev/null 2>&1; then
-        success "Docker: $(docker --version | cut -d' ' -f3 | cut -d',' -f1)"
-    else
-        warning "Docker not working"
-    fi
-    
-    # Test Docker Compose
-    if command -v "$HOME/.local/bin/docker-compose" >/dev/null 2>&1; then
-        success "Docker Compose (pipx): Available"
-    elif docker compose version >/dev/null 2>&1; then
-        success "Docker Compose (native): Available"
-    elif docker-compose --version >/dev/null 2>&1; then
-        success "Docker Compose (system): Available"
-    else
-        warning "Docker Compose not working"
-    fi
-    
-    # Test Docker permissions
-    if docker ps >/dev/null 2>&1; then
-        success "Docker permissions working"
-    elif sudo docker ps >/dev/null 2>&1; then
-        warning "Docker works with sudo only - run 'newgrp docker' after deployment"
-    else
-        warning "Docker not accessible"
-    fi
-    
-    # Test Docker permissions immediately and suggest next steps
-    if docker ps >/dev/null 2>&1; then
-        success "Docker permissions working - you can use: docker compose up -d"
-    elif sudo docker ps >/dev/null 2>&1; then
-        warning "Docker works with sudo only"
-        info "You can use: sudo docker compose up -d"
-        info "Or run: newgrp docker (then use without sudo)"
-    else
-        warning "Docker not accessible - check installation"
-    fi
-    
-    success "Kali-specific fixes completed"
-    
-    # Provide immediate usage instructions
-    info "🎯 Ready to start containers:"
-    info "   Option 1: sudo docker compose up -d"
-    info "   Option 2: newgrp docker && docker compose up -d"
-    info "   Option 3: Log out and back in, then: docker compose up -d"
-}
+#
 
 # Run auto chmod at start
 check_permissions
@@ -299,7 +173,7 @@ EOF
 #!/bin/bash
 # 🚨 Kali Linux Quick Fix Script
 echo "🚨 Running Kali Linux comprehensive fixes..."
-echo "This script fixes Docker Compose segfault, permissions, and package issues."
+echo "(legacy container fix script reference)"
 echo ""
 
 # Re-run the deployment with built-in Kali fixes
@@ -361,145 +235,7 @@ detect_os() {
     info "📍 Detected: $OS ($DISTRO)"
 }
 
-# Check if Docker is installed
-check_docker() {
-    info "🐳 Checking Docker installation..."
-    
-    if command -v docker >/dev/null 2>&1; then
-        if docker --version >/dev/null 2>&1; then
-            DOCKER_VERSION=$(docker --version | cut -d' ' -f3 | cut -d',' -f1)
-            success "Docker is installed (version $DOCKER_VERSION)"
-            
-            # Check if Docker daemon is running
-            if docker info >/dev/null 2>&1; then
-                success "Docker daemon is running"
-                return 0
-            else
-                warning "Docker is installed but daemon is not running"
-                start_docker_daemon
-                return 0
-            fi
-        else
-            warning "Docker command found but not working properly"
-            return 1
-        fi
-    else
-        warning "Docker is not installed"
-        return 1
-    fi
-}
-
-# Start Docker daemon
-start_docker_daemon() {
-    info "Starting Docker daemon..."
-    
-    case "$DISTRO" in
-        ubuntu|debian|kali)
-            sudo systemctl start docker || sudo service docker start
-            sudo systemctl enable docker
-            ;;
-        centos|rhel|fedora)
-            sudo systemctl start docker
-            sudo systemctl enable docker
-            ;;
-        arch)
-            sudo systemctl start docker
-            sudo systemctl enable docker
-            ;;
-        *)
-            warning "Unknown distribution, trying generic Docker start..."
-            sudo systemctl start docker 2>/dev/null || sudo service docker start 2>/dev/null || true
-            ;;
-    esac
-    
-    # Add user to docker group if not already
-    if ! groups | grep -q docker; then
-        info "Adding user to docker group..."
-        sudo usermod -aG docker "$USER"
-        warning "You may need to log out and back in for Docker group changes to take effect"
-    fi
-}
-
-# Install Docker
-install_docker() {
-    info "🐳 Installing Docker..."
-    
-    case "$DISTRO" in
-        ubuntu|debian|kali)
-            # Update package index
-            sudo apt-get update
-            
-            # Install prerequisites
-            sudo apt-get install -y apt-transport-https ca-certificates curl gnupg lsb-release
-            
-            # Add Docker's official GPG key
-            if [[ "$DISTRO" == "kali" ]]; then
-                # Kali-specific Docker installation
-                curl -fsSL https://download.docker.com/linux/debian/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
-                echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/debian bullseye stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-            else
-                curl -fsSL https://download.docker.com/linux/$DISTRO/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
-                echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/$DISTRO $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-            fi
-            
-            # Install Docker Engine
-            sudo apt-get update
-            sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
-            
-            # Fix docker-compose for Kali
-            if [[ "$DISTRO" == "kali" ]]; then
-                sudo apt-get remove -y docker-compose 2>/dev/null || true
-                
-                # Install via pipx (isolated environment)
-                sudo apt-get install -y pipx python3-venv
-                pipx install docker-compose || {
-                    # Fallback: use --break-system-packages
-                    sudo pip3 install docker-compose --break-system-packages
-                }
-                
-                # Ensure pipx bin is in PATH
-                export PATH="$HOME/.local/bin:$PATH"
-            fi
-            ;;
-            
-        centos|rhel)
-            # Install required packages
-            sudo yum install -y yum-utils
-            
-            # Add Docker repository
-            sudo yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
-            
-            # Install Docker Engine
-            sudo yum install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
-            ;;
-            
-        fedora)
-            # Install required packages
-            sudo dnf -y install dnf-plugins-core
-            
-            # Add Docker repository
-            sudo dnf config-manager --add-repo https://download.docker.com/linux/fedora/docker-ce.repo
-            
-            # Install Docker Engine
-            sudo dnf install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
-            ;;
-            
-        arch)
-            sudo pacman -S --noconfirm docker docker-compose
-            ;;
-            
-        *)
-            warning "Unsupported distribution for automatic Docker installation: $DISTRO"
-            warning "Please install Docker manually from: https://docs.docker.com/engine/install/"
-            return 1
-            ;;
-    esac
-    
-    # Start and enable Docker service
-    start_docker_daemon
-    
-    success "Docker installation completed"
-}
+#
 
 # Install dependencies based on OS
 install_dependencies() {
@@ -515,28 +251,7 @@ install_dependencies() {
             sudo apt-get update
             sudo apt-get install -y curl wget git build-essential postgresql postgresql-contrib redis-server nodejs npm
             
-            # Kali-specific fixes
-            if [[ "$DISTRO" == "kali" ]]; then
-                # Fix docker-compose segfault issue - use pipx instead of pip
-                sudo apt-get remove -y docker-compose 2>/dev/null || true
-                
-                # Install pipx for isolated Python packages
-                sudo apt-get install -y pipx python3-venv
-                
-                # Install docker-compose via pipx (isolated environment)
-                pipx install docker-compose || {
-                    # Fallback: use --break-system-packages if pipx fails
-                    sudo pip3 install docker-compose --break-system-packages
-                }
-                
-                # Install additional Kali dependencies
-                sudo apt-get install -y python3-dev libpq-dev
-                
-                # Ensure pipx bin is in PATH
-                export PATH="$HOME/.local/bin:$PATH"
-                echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
-                echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc
-            fi
+            #
             
             # Install Node.js 18+ if needed
             if ! node --version | grep -q "v1[89]\|v[2-9][0-9]"; then
@@ -609,23 +324,7 @@ kali_permission_fixes() {
             sudo chown -R $USER:$USER "$PWD" 2>/dev/null || true
         fi
         
-        # Fix Docker group permissions properly
-        if command -v docker >/dev/null 2>&1; then
-            if ! groups | grep -q docker; then
-                info "Adding user to docker group..."
-                sudo usermod -aG docker "$USER"
-                
-                # Try to refresh group membership without logout
-                newgrp docker 2>/dev/null || true
-                
-                warning "Docker group added. You may need to log out and back in, or run: newgrp docker"
-            fi
-            
-            # Ensure Docker socket has proper permissions
-            if [[ -S /var/run/docker.sock ]]; then
-                sudo chmod 666 /var/run/docker.sock 2>/dev/null || true
-            fi
-        fi
+    #
         
         success "Kali permission fixes applied"
     fi
@@ -637,29 +336,7 @@ detect_os
 # Apply Kali fixes if needed
 kali_permission_fixes
 
-# Check and install Docker if needed
-if ! check_docker; then
-    read -p "🐳 Docker is not installed or not working. Install Docker? (Y/n): " install_docker_choice
-    if [[ "$install_docker_choice" != "n" && "$install_docker_choice" != "N" ]]; then
-        install_docker
-        
-        # Verify installation
-        if check_docker; then
-            success "Docker is now installed and running"
-        else
-            error "Docker installation failed or is not working"
-            warning "You can continue without Docker, but some features may not work"
-        fi
-    else
-        warning "Skipping Docker installation"
-    fi
-fi
-
-# Run Kali-specific fixes if needed
-if [[ "$DISTRO" == "kali" ]]; then
-    info "🐉 Running Kali-specific fixes..."
-    run_kali_fixes
-fi
+#
 
 # Install other dependencies
 install_dependencies
@@ -786,16 +463,7 @@ success "Required directories created"
 # Install npm dependencies
 info "🚀 Setting up PhishNet application..."
 
-# Generate package-lock.json if missing (fixes Docker build)
-if [[ ! -f "package-lock.json" ]]; then
-    info "Generating package-lock.json for Docker compatibility..."
-    npm install --package-lock-only 2>/dev/null || npm install --dry-run 2>/dev/null || true
-    if [[ -f "package-lock.json" ]]; then
-        success "package-lock.json generated"
-    else
-        warning "Could not generate package-lock.json - Docker build may use npm install fallback"
-    fi
-fi
+#
 
 npm install
 
@@ -840,30 +508,10 @@ echo -e "${GREEN}======================================${NC}"
 echo -e "🌐 URL: http://localhost:3000"
 echo -e "📧 Email: admin@phishnet.local"
 echo -e "🔑 Password: admin123"
-if command -v docker >/dev/null 2>&1; then
-    echo -e "🐳 Docker: Available"
-else
-    echo -e "🐳 Docker: Not installed"
-fi
+#
 
 # Kali-specific instructions
-if [[ "$DISTRO" == "kali" ]]; then
-    echo -e "${YELLOW}======================================${NC}"
-    echo -e "${YELLOW}🐉 Kali Linux Specific Notes 🐉${NC}"
-    echo -e "${YELLOW}======================================${NC}"
-    echo -e "🔧 If Docker permission issues:"
-    echo -e "   newgrp docker"
-    echo -e "   # OR log out and back in"
-    echo -e ""
-    echo -e "🐳 Docker Compose commands:"
-    echo -e "   docker compose up -d        (recommended)"
-    echo -e "   sudo docker compose up -d   (if permissions fail)"
-    echo -e ""
-    echo -e "🚨 If issues persist, run:"
-    echo -e "   ./kali-quick-fix.sh         (standalone fix script)"
-    echo -e "   ./deploy.sh                 (re-run with built-in fixes)"
-    echo -e "${YELLOW}======================================${NC}"
-fi
+#
 
 echo -e "${GREEN}======================================${NC}"
 echo ""
@@ -911,8 +559,6 @@ create_friend_package() {
         "WINDOWS-SETUP.md"
         "UNIVERSAL-SETUP.md"
         "package.json"
-        "docker-compose.yml"
-        "Dockerfile"
         ".env.example"
     )
     
@@ -963,11 +609,6 @@ create_friend_package() {
 4. Start: `./start.sh`
 5. Access: http://localhost:3000
 
-### For Docker Users (Any OS)
-1. Extract package and navigate to folder
-2. Run: `docker compose up -d`
-3. Access: http://localhost:3000
-
 ## Default Login Credentials
 - **URL**: http://localhost:3000
 - **Email**: admin@phishnet.local
@@ -978,7 +619,7 @@ create_friend_package() {
 ✅ PostgreSQL (Database)
 ✅ Redis (Cache & Sessions)
 ✅ Git (Version control)
-✅ Docker (Optional containerization)
+#
 
 ## Deployment Features
 - **Auto-Detection**: Automatically detects your operating system
@@ -1050,7 +691,7 @@ sudo systemctl status postgresql redis-server
 - ✅ Complete PhishNet source code
 - ✅ Automated deployment scripts (Windows & Linux)
 - ✅ Database schema and migrations
-- ✅ Pre-configured Docker setup
+#
 - ✅ Comprehensive documentation
 - ✅ Troubleshooting guides
 - ✅ Sample configurations

@@ -92,8 +92,8 @@
 - **Assigned To**: Development Team
 - **Created Date**: 2025-08-09
 - **Last Updated**: 2025-08-09
-- **Resolution**: Need to start PostgreSQL service or use Docker container
-- **Notes**: Docker Compose configuration available but Docker not installed/running
+- **Resolution**: Start PostgreSQL service locally (container option deprecated)
+- **Notes**: Ensure native PostgreSQL service is active (container setup deprecated)
 
 ---
 

@@ -151,45 +151,7 @@ PhishNet-Database/          # Database team access
 ```
 
 ### **Codespace Configuration**
-```yaml
-# .devcontainer/frontend.devcontainer.json
-{
-  "name": "PhishNet Frontend",
-  "build": {
-    "dockerfile": "frontend.Dockerfile"
-  },
-  "mounts": [
-    "source=${localWorkspaceFolder}/client,target=/workspace/client,type=bind",
-    "source=${localWorkspaceFolder}/shared/types,target=/workspace/shared/types,type=bind"
-  ],
-  "forwardPorts": [3000, 3001],
-  "postCreateCommand": "npm run setup:frontend",
-  "customizations": {
-    "vscode": {
-      "settings": {
-        "files.exclude": {
-          "**/server/**": true,
-          "**/migrations/**": true
-        }
-      }
-    }
-  }
-}
-
-# .devcontainer/backend.devcontainer.json  
-{
-  "name": "PhishNet Backend",
-  "build": {
-    "dockerfile": "backend.Dockerfile"
-  },
-  "mounts": [
-    "source=${localWorkspaceFolder}/server,target=/workspace/server,type=bind",
-    "source=${localWorkspaceFolder}/shared,target=/workspace/shared,type=bind"
-  ],
-  "forwardPorts": [3001, 5432],
-  "postCreateCommand": "npm run setup:backend"
-}
-```
+Container-based devcontainer templates removed (Aug 2025). Use native Node/Postgres development.
 
 ## 🛡️ **Security Safeguards (Practical)**
 

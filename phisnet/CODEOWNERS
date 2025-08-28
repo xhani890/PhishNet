@@ -8,8 +8,6 @@
 
 # Root configuration files
 package.json                    @gh0st-bit @team-leads
-docker-compose.yml             @gh0st-bit @team-leads
-Dockerfile                     @gh0st-bit @team-leads
 .env.example                   @gh0st-bit @team-leads
 
 # Security and CI/CD

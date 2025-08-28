@@ -31,7 +31,7 @@ deploy.bat
 start.bat
 ```
 
-**📋 What gets installed:** Node.js, PostgreSQL, Redis, Git, Docker (optional)  
+**📋 What gets installed:** Node.js, PostgreSQL, Redis, Git  
 **🔐 Database Credentials:** `postgres` / `postgres`
 
 ### 🐧 Linux/macOS (Universal)
@@ -70,17 +70,7 @@ chmod +x deploy.sh
 
 **🔐 Database Credentials:** `postgres` / `postgres` (standardized across all platforms)
 
-### �🐳 Option 1: Docker (Recommended)
-**Best for:** Production, Testing, Easy Setup
-
-```bash
-git clone https://github.com/gh0st-bit/PhishNet.git
-cd PhishNet/phisnet
-chmod +x scripts/docker-setup.sh
-./scripts/docker-setup.sh
-```
-
-### ⚙️ Option 2: Manual Setup  
+### ⚙️ Option 1: Manual Setup  
 **Best for:** Development, Custom Configuration
 
 ```bash
@@ -90,13 +80,13 @@ chmod +x scripts/setup.sh
 ./scripts/setup.sh
 ```
 
-### 🪟 Option 3: Windows
+### 🪟 Option 2: Windows
 **For Windows PowerShell:**
 
 ```powershell
 git clone https://github.com/gh0st-bit/PhishNet.git
 cd PhishNet\phisnet
-.\scripts\docker-setup.ps1
+.\scripts\setup.ps1
 ```
 
 ---
@@ -194,27 +184,6 @@ http://localhost
 ---
 
 ## 🛠️ Quick Commands Reference
-
-### Docker Management
-```bash
-# Check status
-docker-compose ps
-
-# View logs
-docker-compose logs -f app
-
-# Restart services
-docker-compose restart
-
-# Stop all services
-docker-compose down
-
-# Start services
-docker-compose up -d
-
-# Update application
-git pull && docker-compose up -d --build
-```
 
 ### Manual Installation
 ```bash
@@ -338,26 +307,21 @@ chmod +x scripts/setup.sh
 
 ### Application Won't Load
 ```bash
-# Check if services are running
-docker-compose ps
-# or
-ps aux | grep node
+# Check if node process is running
+ps aux | grep node | grep -v grep
 
 # Check logs for errors
-docker-compose logs app
-# or
 tail -f logs/phishnet.log
 ```
 
+(legacy restart command removed – use native service manager or restart Node process)
 ### Database Connection Failed
 ```bash
 # Test database connection
-docker-compose exec database psql -U phishnet_user -d phishnet
-# or
 psql -h localhost -U phishnet_user -d phishnet
 
-# Restart database
-docker-compose restart database
+# Restart PostgreSQL (examples)
+sudo systemctl restart postgresql || sudo service postgresql restart
 ```
 
 ### Email Not Sending
@@ -427,7 +391,6 @@ PORT=3002
 
 | Task | Time Required |
 |------|---------------|
-| **Docker Setup** | 5-10 minutes |
 | **Manual Setup** | 10-15 minutes |
 | **First Login & Password Change** | 2 minutes |
 | **Email Configuration** | 3-5 minutes |

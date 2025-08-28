@@ -21,7 +21,7 @@ if (!WORKSPACE_TYPE) {
 const ACCESS_RULES = {
     frontend: {
         allowed: ['client/', 'shared/types/', 'docs/frontend/', 'scripts/frontend-mock-server.js', 'vite.config.ts', '.env.frontend', 'package.json'],
-        forbidden: ['server/', 'migrations/', '.env', '.env.codespace', '.env.codespaces', '.env.docker', '.env.example', 'shared/schema.ts'],
+    forbidden: ['server/', 'migrations/', '.env', '.env.codespace', '.env.codespaces', '.env.example', 'shared/schema.ts'],
         description: 'Frontend Developer Workspace'
     },
     backend: {

@@ -15,10 +15,7 @@ deploy.bat
 start.bat
 ```
 
-### Option 3: Docker (If Docker Desktop is installed)
-```cmd
-docker compose up -d
-```
+<!-- (Container option removed – Windows now uses native services only) -->
 
 ## System Requirements
 
@@ -34,7 +31,7 @@ The deployment script will automatically install:
 2. **PostgreSQL** - Database server
 3. **Redis** - Caching and session storage
 4. **Git** - Version control
-5. **Docker Desktop** - Containerization (optional)
+5. (Legacy containerization option removed)
 
 ## Installation Methods
 
@@ -74,7 +71,7 @@ Start-Service postgresql-x64-XX  # Replace XX with version
 ```powershell
 # Redis for Windows alternatives:
 # 1. Memurai (Redis-compatible): https://www.memurai.com/
-# 2. Docker: docker run -d -p 6379:6379 redis:alpine
+<!-- legacy container example removed -->
 ```
 
 ### Common Issues
@@ -111,7 +108,7 @@ Download from: https://www.enterprisedb.com/downloads/postgres-postgresql-downlo
 Windows options:
 1. **Memurai**: https://www.memurai.com/
 2. **Redis on WSL**: Enable WSL and install Redis in Linux
-3. **Docker**: `docker run -d -p 6379:6379 redis:alpine`
+3. (alternative deprecated)
 
 ### Git
 Download from: https://git-scm.com/download/win
@@ -142,10 +139,7 @@ start.bat
 .\start.ps1 -Production
 ```
 
-### Docker Mode
-```cmd
-docker compose up -d
-```
+<!-- deprecated mode note removed -->
 
 ## Accessing PhishNet
 
@@ -158,7 +152,7 @@ Once started, open your browser to:
 
 - **Service Management**: Automatically starts/stops PostgreSQL and Redis services
 - **Package Manager**: Uses Chocolatey for easy dependency management
-- **Docker Integration**: Supports Docker Desktop for Windows
+- (legacy integration removed)
 - **Path Management**: Automatically adds tools to system PATH
 - **Execution Policy**: Handles PowerShell security settings
 

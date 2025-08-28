@@ -23,8 +23,8 @@
     - ESLint security rules integration
     - Secrets detection and pattern matching
   - **Container Security Scanning:**
-    - Trivy vulnerability scanner for Docker images
-    - Docker security best practices validation
+  - (Removed later) container image scanning
+  - (Removed later) container hardening checklist
     - SARIF format security reporting
   - **Automated Security Workflows:**
     - Daily scheduled security scans (2 AM UTC)

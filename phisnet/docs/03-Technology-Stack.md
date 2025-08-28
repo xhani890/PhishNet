@@ -574,8 +574,8 @@ RATE_LIMIT_WINDOW=900000
 3. **tRPC** - Type-safe API calls
 4. **Prisma** - Alternative ORM consideration
 5. **Redis** - Caching and session storage
-6. **Docker** - Containerization
-7. **Kubernetes** - Container orchestration
+6. **Redis** - Caching and session storage
+7. **GraphQL** - Alternative API approach (evaluation)
 8. **GraphQL** - Alternative API approach
 
 ### Monitoring & Analytics

@@ -1,9 +1,4 @@
-# ===============================================
-# PhishNet Docker Ignore
-# Version: 1.0
-# Created: July 25, 2025
-# Description: Files and directories to exclude from Docker build
-# ===============================================
+# Intentionally minimal ignore file retained after container removal (Aug 2025)
 
 # Node modules
 node_modules/
@@ -115,8 +110,7 @@ temp/
 ehthumbs.db
 Thumbs.db
 
-# Docker
-.docker/
+# (container artifacts removed)
 
 # Test files
 test-results/

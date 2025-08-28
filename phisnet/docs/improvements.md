@@ -16,7 +16,7 @@ PhishNet is a comprehensive phishing simulation platform designed to help organi
 - Scalable microservices architecture
 - Comprehensive user management
 - Real-time analytics and reporting
-- Docker containerization for easy deployment
+- (legacy containerization removed)
 
 ---
 

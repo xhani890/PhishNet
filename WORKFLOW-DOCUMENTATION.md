@@ -97,14 +97,14 @@ This document provides comprehensive details about all GitHub Actions workflows 
 ## 🚀 Deployment & Operations Workflows
 
 ### 7. 🚢 Deployment Automation (`deployment-automation.yml`)
-**Purpose**: Automated deployment pipeline with Docker containerization
+**Purpose**: Automated deployment pipeline (previously container-based; now script-driven)
 - **Triggers**: 
   - Push to `main` branch
   - Release tags (`v*`)
   - Published releases
   - Manual trigger with environment selection
 - **Actions**:
-  - Docker image build and push to GHCR
+  - (Legacy) Image build/push step removed after de-containerization
   - Multi-environment deployment support
   - Database migration execution
   - Health check verification

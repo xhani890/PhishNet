@@ -2,22 +2,8 @@
 
 ## 🚨 **Common Kali Issues & Fixes**
 
-### **1. Docker Compose Segmentation Fault**
-**Problem:** `zsh: segmentation fault docker-compose`
-
-**Solution:**
-```bash
-# Run the Kali Docker fix script
-./kali-docker-fix.sh
-
-# OR manually fix:
-sudo apt-get remove -y docker-compose
-sudo apt-get install -y python3-pip
-sudo pip3 install docker-compose
-
-# Alternative: Use newer syntax
-docker compose up -d  # instead of docker-compose up -d
-```
+### **1. Legacy Container Issues (Removed)**
+Container tooling was removed. Use native deployment via `./deploy.sh` and system services (PostgreSQL, Redis, Node.js). Optional cleanup: remove any old container packages if still installed.
 
 ### **2. Database Configuration Missing**
 **Problem:** `Database configuration missing. Check your .env file.`
@@ -78,22 +64,18 @@ sudo systemctl enable redis
 
 ## 🔧 **Quick Fix Commands for Kali**
 
-### **Complete Kali Setup:**
+### **Complete Kali Setup (Native Only):**
 ```bash
 # 1. Clone repository
 git clone https://github.com/gh0st-bit/PhishNet.git
 cd PhishNet/phisnet
 
 # 2. Fix permissions
-chmod +x deploy.sh kali-docker-fix.sh
+chmod +x deploy.sh
 
-# 3. Fix Docker Compose (if needed)
-./kali-docker-fix.sh
-
-# 4. Run deployment
+# 3. Run deployment
 ./deploy.sh
-
-# 5. If database issues, manually verify:
+# 4. If database issues, manually verify:
 cat .env
 sudo systemctl status postgresql redis-server
 ```
@@ -101,11 +83,11 @@ sudo systemctl status postgresql redis-server
 ### **Manual Service Start:**
 ```bash
 # Start all required services:
-sudo systemctl start postgresql redis-server docker
-sudo systemctl enable postgresql redis-server docker
+sudo systemctl start postgresql redis-server
+sudo systemctl enable postgresql redis-server
 
 # Verify services:
-sudo systemctl status postgresql redis-server docker
+sudo systemctl status postgresql redis-server
 ```
 
 ### **Database Manual Setup:**
@@ -115,39 +97,20 @@ sudo -u postgres createuser -P phishnet_user  # Enter: phishnet_password
 sudo -u postgres createdb -O phishnet_user phishnet_db
 ```
 
-## 🐳 **Docker Issues**
-
-### **Docker Daemon Not Running:**
-```bash
-sudo systemctl start docker
-sudo usermod -aG docker $USER
-# Log out and back in
-```
-
-### **Docker Compose Alternatives:**
-```bash
-# If docker-compose segfaults, use:
-docker compose up -d          # New syntax
-python3 -m compose up -d      # Python module
-pip3 install docker-compose   # Reinstall via pip
-```
+## Legacy Container Stack (Removed)
+Former container-based workflow was deprecated. Ensure only native services run.
 
 ## 🎯 **Testing Fixes**
 
 ### **Verify Everything Works:**
 ```bash
-# Check services:
-sudo systemctl status postgresql redis-server docker
+sudo systemctl status postgresql redis-server
 
 # Check database connection:
 PGPASSWORD=phishnet_password psql -h localhost -U phishnet_user -d phishnet_db -c "SELECT 1;"
 
 # Check Redis:
 redis-cli ping
-
-# Check Docker:
-docker --version
-docker-compose --version  # or docker compose version
 
 # Check Node.js:
 node --version
@@ -168,7 +131,7 @@ npx tsx server/index.ts
 ### **Clean Installation:**
 ```bash
 # Remove and reinstall everything:
-sudo apt-get remove -y docker docker-compose postgresql redis-server nodejs npm
+sudo apt-get remove -y postgresql redis-server nodejs npm
 sudo apt-get autoremove -y
 sudo apt-get update
 
@@ -184,8 +147,6 @@ sudo apt-get install -y curl wget git build-essential
 sudo apt-get install -y postgresql postgresql-contrib
 sudo apt-get install -y redis-server
 sudo apt-get install -y nodejs npm
-sudo apt-get install -y docker.io
-sudo pip3 install docker-compose
 ```
 
 ## 📞 **Get Help**

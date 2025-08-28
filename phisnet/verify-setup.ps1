@@ -130,31 +130,7 @@ try {
     Add-Warning
 }
 
-# Check Docker (optional)
-Write-Info "Checking Docker installation..."
-try {
-    $dockerVersion = docker --version 2>$null
-    if ($dockerVersion) {
-        Write-Success "Docker installed: $dockerVersion"
-        
-        try {
-            docker ps >$null 2>&1
-            if ($LASTEXITCODE -eq 0) {
-                Write-Success "Docker service is running"
-            } else {
-                Write-Warning "Docker service not running or permission issues"
-                Add-Warning
-            }
-        } catch {
-            Write-Warning "Docker service not running"
-            Add-Warning
-        }
-    } else {
-        Write-Info "Docker not found (optional deployment method)"
-    }
-} catch {
-    Write-Info "Docker not found (optional deployment method)"
-}
+# (legacy container verification removed)
 
 # Check project files
 Write-Info "Checking PhishNet project files..."

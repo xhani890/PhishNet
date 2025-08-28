@@ -23,8 +23,6 @@ on:
         type: boolean
 
 env:
-  REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}/phishnet
   NODE_VERSION: '18'
 
 permissions:
@@ -38,23 +36,13 @@ jobs:
   build:
     runs-on: ubuntu-latest
     outputs:
-      image-tag: ${{ steps.tag.outputs.single-tag }}
-      image-digest: ${{ steps.build.outputs.digest }}
       version: ${{ steps.version.outputs.version }}
       
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
       
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
-      
-    - name: Log in to Container Registry
-      uses: docker/login-action@v3
-      with:
-        registry: ${{ env.REGISTRY }}
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
+  # Container build steps removed (Aug 2025)
         
     - name: Extract version
       id: version
@@ -67,185 +55,14 @@ jobs:
         echo "version=$VERSION" >> $GITHUB_OUTPUT
         echo "Version: $VERSION"
         
-    - name: Extract metadata
-      id: meta
-      uses: docker/metadata-action@v5
-      with:
-        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-        tags: |
-          type=ref,event=branch
-          type=ref,event=pr
-          type=ref,event=tag
-          type=sha,prefix={{branch}}-
-          
-    - name: Build and push Docker image
-      id: build
-      uses: docker/build-push-action@v5
-      with:
-        context: ./phisnet
-        file: ./phisnet/Dockerfile.production
-        push: true
-        tags: ${{ steps.meta.outputs.tags }}
-        labels: ${{ steps.meta.outputs.labels }}
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
-        build-args: |
-          NODE_VERSION=${{ env.NODE_VERSION }}
-          BUILD_VERSION=${{ steps.version.outputs.version }}
-          
-    - name: Extract single tag for testing
-      id: tag
-      run: |
-        # Extract the first tag from metadata output for testing
-        SINGLE_TAG=$(echo "${{ steps.meta.outputs.tags }}" | head -n1)
-        echo "single-tag=$SINGLE_TAG" >> $GITHUB_OUTPUT
-        echo "Using tag for testing: $SINGLE_TAG"
+    - name: Note
+      run: echo "Container build removed; producing version only"
 
-  test-deploy:
-    runs-on: ubuntu-latest
-    needs: build
-    if: ${{ !inputs.skip_tests }}
-    
-    services:
-      postgres:
-        image: postgres:13
-        env:
-          POSTGRES_USER: test
-          POSTGRES_PASSWORD: test
-          POSTGRES_DB: test
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-      
-      redis:
-        image: redis:7
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-    
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-      
-    - name: Install service utilities
-      run: |
-        sudo apt-get update -q
-        sudo apt-get install -y postgresql-client redis-tools
-        
-    - name: Test Docker image
-      run: |
-        echo "Testing image: ${{ needs.build.outputs.image-tag }}"
-        
-        # Wait for services to be ready
-        echo "Waiting for services to be ready..."
-        sleep 15
-        
-        # Verify services are accessible
-        echo "=== Service Status Check ==="
-        pg_isready -h localhost -p 5432 -U test || echo "PostgreSQL not ready"
-        redis-cli -h localhost -p 6379 ping || echo "Redis not ready"
-        
-        # Start container connected to the same network as GitHub Actions services
-        docker run --rm -d --name phishnet-test \
-          --add-host host.docker.internal:host-gateway \
-          -e NODE_ENV=production \
-          -e PORT=3001 \
-          -e DATABASE_URL=postgresql://test:test@host.docker.internal:5432/test \
-          -e REDIS_URL=redis://host.docker.internal:6379 \
-          -p 3001:3001 \
-          ${{ needs.build.outputs.image-tag }} || exit 1
-        
-        echo "Container started, waiting for initialization..."
-        sleep 15
-        
-        # Check container status and provide diagnostics
-        echo "=== Container Status ==="
-        docker ps -a | grep phishnet-test || echo "Container not found in process list"
-        
-        echo "=== Container Logs ==="
-        docker logs phishnet-test || echo "Container logs not available; container may have exited immediately."
-        
-        echo "=== Container Inspection ==="
-        docker inspect phishnet-test --format='{{.State.Status}}: {{.State.ExitCode}}' || echo "Container inspect not available - container likely exited."
-        
-        # Wait a bit more and check if still running
-        sleep 10
-        if docker ps | grep -q phishnet-test; then
-          echo "✅ Container is running successfully"
-          
-          # Try to test application endpoints if possible
-          if curl -f http://localhost:3001/health 2>/dev/null; then
-            echo "✅ Health endpoint responding"
-          else
-            echo "⚠️  Health endpoint not responding (may be expected)"
-          fi
-          
-          # Try testing basic connectivity
-          if curl -f http://localhost:3001/ 2>/dev/null; then
-            echo "✅ Application responding on port 3001"
-          else
-            echo "⚠️  Application not responding on port 3001"
-          fi
-          
-          docker stop phishnet-test || echo "Container already exited."
-        else
-          echo "❌ Container exited during test period"
-          echo "Container logs for debugging:"
-          docker logs phishnet-test 2>&1 || echo "No logs available"
-          
-          # Check if this is a critical failure or expected behavior
-          EXIT_CODE=$(docker inspect phishnet-test --format='{{.State.ExitCode}}' 2>/dev/null || echo "1")
-          if [ "$EXIT_CODE" = "0" ]; then
-            echo "✅ Container exited gracefully - this may be expected behavior"
-          else
-            echo "⚠️  Container exited with non-zero code: $EXIT_CODE"
-            echo "This may indicate an issue but continuing pipeline..."
-          fi
-          
-          # For debugging: try a simpler container test
-          echo "=== Attempting simple container test ==="
-          docker run --rm ${{ needs.build.outputs.image-tag }} --version 2>/dev/null || echo "Container version check failed"
-        fi
-        
-    - name: Security scan image
-      uses: anchore/scan-action@v3
-      id: scan
-      with:
-        image: ${{ needs.build.outputs.image-tag }}
-        fail-build: false
-        severity-cutoff: critical
-        output-format: sarif
-      continue-on-error: true
-        
-    - name: Upload scan results
-      uses: github/codeql-action/upload-sarif@v3
-      if: always()
-      with:
-        sarif_file: results.sarif
-        
-    - name: Security scan summary
-      if: always()
-      run: |
-        echo "## 🔍 Security Scan Results" >> $GITHUB_STEP_SUMMARY
-        if [ "${{ steps.scan.outcome }}" == "success" ]; then
-          echo "✅ **Security Scan**: PASSED (no critical vulnerabilities)" >> $GITHUB_STEP_SUMMARY
-        else
-          echo "⚠️ **Security Scan**: Vulnerabilities detected (continuing pipeline)" >> $GITHUB_STEP_SUMMARY
-        fi
-        echo "- **Image**: ${{ needs.build.outputs.image-tag }}" >> $GITHUB_STEP_SUMMARY
-        echo "- **Severity Threshold**: Critical" >> $GITHUB_STEP_SUMMARY
+  # Container image test & scan job removed
 
   deploy-staging:
     runs-on: ubuntu-latest
-    needs: [build, test-deploy]
+    needs: [build]
     if: ${{ (github.ref == 'refs/heads/main' || inputs.environment == 'staging') && !cancelled() }}
     environment: staging
     
@@ -272,7 +89,6 @@ jobs:
     - name: Deploy to staging
       run: |
         echo "Deploying to staging environment..."
-        echo "Image: ${{ needs.build.outputs.image-tag }}"
         echo "Version: ${{ needs.build.outputs.version }}"
         
         # Simulate deployment process
@@ -296,7 +112,7 @@ jobs:
 
   deploy-production:
     runs-on: ubuntu-latest
-    needs: [build, test-deploy, deploy-staging]
+    needs: [build, deploy-staging]
     if: ${{ (startsWith(github.ref, 'refs/tags/') || inputs.environment == 'production') && !cancelled() }}
     environment: production
     
@@ -323,7 +139,6 @@ jobs:
     - name: Deploy to production
       run: |
         echo "Deploying to production environment..."
-        echo "Image: ${{ needs.build.outputs.image-tag }}"
         echo "Version: ${{ needs.build.outputs.version }}"
         
         # Production deployment with enhanced safety
@@ -350,7 +165,7 @@ jobs:
   post-deployment:
     runs-on: ubuntu-latest
     needs: [deploy-staging, deploy-production]
-    if: always() && (needs.deploy-staging.result == 'success' || needs.deploy-production.result == 'success')
+    if: always()
     
     steps:
     - name: Post-deployment monitoring
@@ -366,11 +181,10 @@ jobs:
           echo "✅ **Production Deployment:** SUCCESS" >> $GITHUB_STEP_SUMMARY
         fi
         
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "**Version:** ${{ needs.build.outputs.version }}" >> $GITHUB_STEP_SUMMARY
-        echo "**Image:** ${{ needs.build.outputs.image-tag }}" >> $GITHUB_STEP_SUMMARY
-        echo "**Deployed by:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
-        echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+  echo "" >> $GITHUB_STEP_SUMMARY
+  echo "**Version:** ${{ needs.build.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+  echo "**Deployed by:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+  echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
         
     - name: Notify deployment completion
       run: |

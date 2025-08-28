@@ -204,10 +204,7 @@ pm2 save
 pm2 startup
 ```
 
-### Docker Deployment
-```bash
-docker-compose up -d
-```
+<!-- legacy container deployment removed -->
 
 ### Systemd Service (Linux)
 ```bash

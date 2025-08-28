@@ -237,10 +237,7 @@ If issues persist:
    - 2GB+ free disk space
    - Internet connection for package installation
 
-3. **Try Docker setup** (alternative):
-   ```bash
-   docker-compose up -d
-   ```
+3. (Container alternative deprecated — use the native scripts.)
 
 4. **Manual setup**: Follow [INSTALLATION.md](INSTALLATION.md) for step-by-step instructions
 

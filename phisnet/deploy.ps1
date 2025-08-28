@@ -30,7 +30,7 @@ Write-Host "🎣 PhishNet Windows Deployment 🎣" -ForegroundColor Blue
 Write-Host "======================================" -ForegroundColor Blue
 Write-Host "🚀 Auto-installs all dependencies" -ForegroundColor Blue
 Write-Host "🔧 Configures services automatically" -ForegroundColor Blue
-Write-Host "🐳 Includes Docker support" -ForegroundColor Blue
+Write-Host "Environment: native services (PostgreSQL, Redis, Node.js)" -ForegroundColor Blue
 Write-Host "======================================" -ForegroundColor Blue
 Write-Host ""
 
@@ -314,62 +314,11 @@ function Install-Redis {
     Write-Info "Redis for Windows options:"
     Write-Info "1. Memurai (Redis alternative): https://www.memurai.com/"
     Write-Info "2. Redis on WSL: wsl --install then install Redis in Linux"
-    Write-Info "3. Docker: docker run -d -p 6379:6379 redis:alpine"
+    Write-Info "3. Native only (containers removed)"
     return $false
 }
 
-# Check and install Docker
-function Install-Docker {
-    Write-Info "🐳 Checking Docker installation..."
-    
-    if (Get-Command docker -ErrorAction SilentlyContinue) {
-        try {
-            $dockerVersion = docker --version
-            Write-Success "Docker is installed ($dockerVersion)"
-            
-            # Check if Docker daemon is running
-            $dockerInfo = docker info 2>$null
-            if ($dockerInfo) {
-                Write-Success "Docker daemon is running"
-                return $true
-            } else {
-                Write-Warning "Docker is installed but daemon is not running"
-                Write-Info "Please start Docker Desktop manually"
-                return $true
-            }
-        } catch {
-            Write-Warning "Docker command found but not working properly"
-        }
-    }
-    
-    Write-Info "Installing Docker Desktop..."
-    
-    if (Get-Command choco -ErrorAction SilentlyContinue) {
-        try {
-            choco install docker-desktop -y
-            Write-Success "Docker Desktop installed via Chocolatey"
-            Write-Warning "Please start Docker Desktop manually after installation"
-            return $true
-        } catch {
-            Write-Warning "Chocolatey installation failed: $($_.Exception.Message)"
-        }
-    }
-    
-    if (Get-Command winget -ErrorAction SilentlyContinue) {
-        try {
-            winget install Docker.DockerDesktop
-            Write-Success "Docker Desktop installed via winget"
-            Write-Warning "Please start Docker Desktop manually after installation"
-            return $true
-        } catch {
-            Write-Warning "winget installation failed: $($_.Exception.Message)"
-        }
-    }
-    
-    Write-Warning "Failed to install Docker automatically"
-    Write-Info "Please install Docker Desktop manually from: https://www.docker.com/products/docker-desktop"
-    return $false
-}
+#
 
 # Main dependency installation
 function Install-Dependencies {
@@ -393,7 +342,7 @@ function Install-Dependencies {
     if (Install-Git) { $success += "Git" } else { $failed += "Git" }
     if (Install-PostgreSQL) { $success += "PostgreSQL" } else { $failed += "PostgreSQL" }
     if (Install-Redis) { $success += "Redis" } else { $failed += "Redis" }
-    if (Install-Docker) { $success += "Docker" } else { $failed += "Docker" }
+    #
     
     # Summary
     if ($success.Count -gt 0) {
@@ -717,21 +666,7 @@ if ($redisService -and $redisService.Status -eq "Running") {
     $issues += "Redis not running"
 }
 
-# Check Docker
-if (Get-Command docker -ErrorAction SilentlyContinue) {
-    try {
-        $dockerInfo = docker info 2>$null
-        if ($dockerInfo) {
-            $services += "Docker (Running)"
-        } else {
-            $services += "Docker (Installed, not running)"
-        }
-    } catch {
-        $services += "Docker (Installed, status unknown)"
-    }
-} else {
-    $issues += "Docker not installed"
-}
+#
 
 # Completion message
 Write-Host ""
@@ -759,11 +694,7 @@ Write-Host "🚀 To start PhishNet:" -ForegroundColor Blue
 Write-Host "   .\start.ps1              (development mode)" -ForegroundColor White
 Write-Host "   .\start.ps1 -Production  (production mode)" -ForegroundColor White
 
-if (Get-Command docker -ErrorAction SilentlyContinue) {
-    Write-Host ""
-    Write-Host "🐳 Docker options:" -ForegroundColor Blue
-    Write-Host "   docker compose up -d     (containerized mode)" -ForegroundColor White
-}
+#
 
 Write-Host "======================================" -ForegroundColor Green
 Write-Host ""
@@ -806,8 +737,6 @@ function Create-FriendPackage {
         "FRIEND-DEPLOYMENT-GUIDE.md", 
         "WINDOWS-SETUP.md",
         "package.json",
-        "docker-compose.yml",
-        "Dockerfile",
         ".env.example"
     )
     
@@ -874,17 +803,15 @@ deploy.bat
 start.bat
 ``````
 
-### Option 2: Docker (If you have Docker Desktop)
-``````bash
-docker compose up -d
-``````
+### Option 2: (second method reserved)
+Container deployment deprecated. Use native scripts only.
 
 ## 🛠️ What Gets Installed
 - Node.js 18+
 - PostgreSQL database
 - Redis cache
 - Git version control
-- Docker Desktop (optional)
+--
 
 ## ⚠️ Troubleshooting
 

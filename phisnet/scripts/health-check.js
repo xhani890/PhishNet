@@ -2,7 +2,7 @@
 // PhishNet Health Check Script
 // Version: 1.0
 // Created: July 25, 2025
-// Description: Health check script for Docker containers
+// Description: Generic health check script (container-agnostic)
 // ===============================================
 
 const http = require('http');

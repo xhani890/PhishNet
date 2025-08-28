@@ -16,7 +16,6 @@
     ".env",
     ".env.codespace",
     ".env.codespaces",
-    ".env.docker",
     ".env.example",
     "shared/schema.ts"
   ],
@@ -25,7 +24,6 @@
     ".env",
     ".env.codespace",
     ".env.codespaces",
-    ".env.docker",
     ".env.example",
     "migrations",
     "server"

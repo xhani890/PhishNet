@@ -280,43 +280,14 @@ main (production-ready)
 
 ## 🚀 Deployment Architecture
 
-### Development Environment (Codespaces)
-```yaml
-# .devcontainer/devcontainer.json
-{
-  "name": "PhishNet Development",
-  "dockerComposeFile": "docker-compose.yml",
-  "service": "app",
-  "workspaceFolder": "/workspace",
-  "features": {
-    "ghcr.io/devcontainers/features/node:1": {},
-    "ghcr.io/devcontainers/features/docker-in-docker:2": {}
-  }
-}
-```
+### Development Environment (Updated)
+Native local services only (former devcontainer variant removed Aug 2025).
 
-### Production Environment
-```yaml
-# docker-compose.prod.yml
-version: '3.8'
-services:
-  app:
-    image: phishnet:latest
-    environment:
-      - NODE_ENV=production
-      - DATABASE_URL=${DATABASE_URL}
-    ports:
-      - "3000:3000"
-  
-  database:
-    image: postgres:15
-    environment:
-      - POSTGRES_DB=phishnet
-      - POSTGRES_USER=${DB_USER}
-      - POSTGRES_PASSWORD=${DB_PASSWORD}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-```
+### Production Environment (Updated)
+Deployment recommendations (post-container removal):
+1. Native systemd units for app, PostgreSQL, Redis
+2. Reverse proxy (Nginx/Traefik) configured manually
+3. Managed DB (RDS) optional; update DATABASE_URL accordingly
 
 ## 📈 Scalability Considerations
 

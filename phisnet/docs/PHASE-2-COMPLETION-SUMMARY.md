@@ -34,7 +34,7 @@
 ### 3. Deployment Automation Pipeline ✅
 - **File:** `.github/workflows/deployment-automation.yml`
 - **Features Implemented:**
-  - Docker containerization with GitHub Container Registry
+  - (Removed in later refactor) containerization layer
   - Multi-environment deployment (staging/production)
   - Deployment testing and security scanning
   - GitHub deployment tracking and status updates

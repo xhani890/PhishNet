@@ -4,10 +4,9 @@
 
 [![Node.js](https://img.shields.io/badge/node-%3E%3D%2018.0.0-brightgreen)](https://nodejs.org/)
 [![TypeScript](https://img.shields.io/badge/typescript-%5E5.0.0-blue)](https://www.typescriptlang.org/)
-[![Docker](https://img.shields.io/badge/docker-ready-blue)](https://www.docker.com/)
 [![PostgreSQL](https://img.shields.io/badge/postgresql-%3E%3D15-blue)](https://www.postgresql.org/)
 
-**🚀 One-Command Setup** • **🔒 Enterprise Grade** • **🐳 Docker Ready**
+**🚀 One-Command Setup** • **🔒 Enterprise Grade**
 
 </div>
 
@@ -22,7 +21,6 @@ PhishNet is a professional phishing simulation platform designed for cybersecuri
 - 📊 **Real-Time Analytics** and detailed reporting
 - 🏢 **Multi-Tenant Support** for organizations
 - 🔒 **Role-Based Access Control** and security features
-- 🐳 **Docker Support** for easy deployment
 
 ---
 
@@ -44,12 +42,7 @@ cd PhishNet\phisnet
 .\deploy.ps1
 ```
 
-#### Docker:
-```bash
-git clone https://github.com/gh0st-bit/PhishNet.git
-cd PhishNet/phisnet
-docker-compose up -d
-```
+> Note: Legacy container quick start removed. Use the platform scripts above for local setup.
 
 ---
 
@@ -171,19 +164,6 @@ This creates a package containing:
 
 ---
 
-## 🐳 Docker Deployment
-
-### Quick Start
-```bash
-docker-compose up -d
-```
-
-### Available Services
-- **PhishNet App:** `http://localhost:3000`
-- **PostgreSQL:** `localhost:5432`
-- **Redis:** `localhost:6379`
-
----
 
 ## �️ Supported Platforms
 
@@ -277,7 +257,7 @@ npm run import-data     # Load sample data
 - **Backend:** Node.js + Express + TypeScript
 - **Database:** PostgreSQL with Drizzle ORM
 - **Cache:** Redis for sessions
-- **Deployment:** Docker + universal scripts
+- **Deployment:** Universal scripts
 
 ---
 

@@ -11,7 +11,6 @@
 
 This guide provides step-by-step instructions for setting up PhishNet in various environments. Choose the deployment method that best fits your needs:
 
-- **🐳 Docker Deployment** - Fastest setup, production-ready
 - **⚙️ Manual Installation** - Full control, development environments
 - **☁️ Cloud Deployment** - Scalable, enterprise-grade
 
@@ -38,10 +37,7 @@ This guide provides step-by-step instructions for setting up PhishNet in various
 
 ### Software Prerequisites
 
-#### For Docker Deployment
-- [ ] **Docker:** Version 20.10 or newer
-- [ ] **Docker Compose:** Version 2.0 or newer
-- [ ] **Git:** Any recent version
+<!-- legacy container deployment removed -->
 
 #### For Manual Installation
 - [ ] **Node.js:** Version 18.0 or newer
@@ -64,129 +60,7 @@ This guide provides step-by-step instructions for setting up PhishNet in various
 
 ## 🚀 Installation Methods
 
-## Method 1: Docker Deployment (Recommended)
-
-### Step 1: Install Docker
-
-#### Ubuntu/Debian
-```bash
-# Update package index
-sudo apt update
-
-# Install dependencies
-sudo apt install apt-transport-https ca-certificates curl gnupg lsb-release
-
-# Add Docker's official GPG key
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
-
-# Set up stable repository
-echo "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-
-# Install Docker Engine
-sudo apt update
-sudo apt install docker-ce docker-ce-cli containerd.io docker-compose-plugin
-
-# Add user to docker group
-sudo usermod -aG docker $USER
-newgrp docker
-```
-
-#### CentOS/RHEL
-```bash
-# Install required packages
-sudo yum install -y yum-utils
-
-# Set up repository
-sudo yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
-
-# Install Docker Engine
-sudo yum install docker-ce docker-ce-cli containerd.io docker-compose-plugin
-
-# Start and enable Docker
-sudo systemctl start docker
-sudo systemctl enable docker
-
-# Add user to docker group
-sudo usermod -aG docker $USER
-newgrp docker
-```
-
-#### macOS
-```bash
-# Using Homebrew
-brew install --cask docker
-
-# Or download Docker Desktop from:
-# https://www.docker.com/products/docker-desktop
-```
-
-#### Windows
-```powershell
-# Using Chocolatey
-choco install docker-desktop
-
-# Or download Docker Desktop from:
-# https://www.docker.com/products/docker-desktop
-```
-
-### Step 2: Clone PhishNet Repository
-
-```bash
-# Clone the repository
-git clone https://github.com/gh0st-bit/PhishNet.git
-
-# Navigate to project directory
-cd PhishNet/phisnet
-
-# Verify files are present
-ls -la
-```
-
-### Step 3: Run Automated Setup
-
-#### Linux/macOS
-```bash
-# Make script executable
-chmod +x scripts/docker-setup.sh
-
-# Run setup script
-./scripts/docker-setup.sh
-```
-
-#### Windows PowerShell
-```powershell
-# Set execution policy (if needed)
-Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
-
-# Run setup script
-.\scripts\docker-setup.ps1
-```
-
-### Step 4: Verify Installation
-
-```bash
-# Check container status
-docker-compose ps
-
-# View logs
-docker-compose logs -f app
-
-# Test application
-curl http://localhost/health
-```
-
-**Expected Output:**
-```
-Name                State           Ports
-phishnet-app        Up (healthy)    0.0.0.0:3001->3001/tcp
-phishnet-db         Up (healthy)    0.0.0.0:5432->5432/tcp
-phishnet-redis      Up (healthy)    0.0.0.0:6379->6379/tcp
-phishnet-nginx      Up              0.0.0.0:80->80/tcp, 0.0.0.0:443->443/tcp
-```
-
----
-
-## Method 2: Manual Installation
+## Method 1: Manual Installation
 
 ### Step 1: Install System Dependencies
 
@@ -426,19 +300,7 @@ sudo apt update && sudo apt upgrade -y
 curl -fsSL https://raw.githubusercontent.com/gh0st-bit/PhishNet/main/scripts/cloud-setup.sh | bash
 ```
 
-#### Using ECS with Docker
-```yaml
-# docker-compose.aws.yml
-version: '3.8'
-services:
-  app:
-    image: phishnet:latest
-    environment:
-      - DATABASE_URL=${DATABASE_URL}
-      - REDIS_URL=${REDIS_URL}
-    ports:
-      - "80:3001"
-```
+<!-- legacy ECS deployment snippet removed -->
 
 ### Google Cloud Platform
 
@@ -605,20 +467,7 @@ curl http://localhost/api/health/redis
 
 ### Service Status
 
-#### Docker Deployment
-```bash
-# Check container status
-docker-compose ps
-
-# View logs
-docker-compose logs app
-docker-compose logs database
-docker-compose logs redis
-docker-compose logs nginx
-
-# Check resource usage
-docker stats
-```
+(legacy log/stat commands removed – use journalctl, systemctl status, or app logs)
 
 #### Manual Installation
 ```bash
@@ -668,7 +517,7 @@ netstat -tulpn | grep -E '(3001|5432|6379)'
 # Check logs
 npm run logs
 # or
-docker-compose logs app
+(legacy log command removed)
 
 # Common causes:
 # 1. Port already in use
@@ -721,26 +570,14 @@ sudo chown -R www-data:www-data uploads
 sudo chmod 755 uploads
 ```
 
-#### Docker Issues
-```bash
-# Restart Docker service
-sudo systemctl restart docker
-
-# Clean up containers
-docker-compose down --volumes
-docker system prune -a
-
-# Rebuild images
-docker-compose build --no-cache
-docker-compose up -d
-```
+(legacy cleanup/build/run commands removed – native only)
 
 ### Log Locations
 
 - **Application Logs:** `logs/phishnet.log`
 - **PostgreSQL Logs:** `/var/log/postgresql/`
 - **Nginx Logs:** `/var/log/nginx/`
-- **Docker Logs:** `docker-compose logs`
+(legacy logs reference removed)
 - **System Logs:** `/var/log/syslog`
 
 ### Getting Help
@@ -834,7 +671,7 @@ npm run db:migrate
 
 # Rebuild and restart
 npm run build
-docker-compose restart app
+# (legacy restart removed) Use your process/service manager instead
 ```
 
 #### System Updates

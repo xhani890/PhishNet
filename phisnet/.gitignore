@@ -22,7 +22,6 @@ out/
 .env.production.local
 .env.codespace
 .env.codespaces
-.env.docker
 
 # Keep .env.example and .env.frontend for reference
 !.env.example

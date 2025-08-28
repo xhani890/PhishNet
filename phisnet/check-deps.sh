@@ -48,10 +48,9 @@ check_command "gcc" "--version"
 check_command "make" "--version"
 
 echo ""
-echo "🐳 Checking Optional Tools..."
-check_command "docker" "--version"
-check_command "docker-compose" "--version"
+echo "🧩 Checking Optional Tools..."
 check_command "pm2" "--version"
+echo "(Native stack only)"
 
 echo ""
 echo "⚙️ Checking Services..."

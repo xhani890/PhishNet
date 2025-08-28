@@ -12,29 +12,17 @@
 1. [Quick Start Guide](#quick-start-guide)
 2. [Deployment Options](#deployment-options)
 3. [Database Setup](#database-setup)
-4. [Docker Deployment](#docker-deployment)
-5. [Manual Setup](#manual-setup)
-6. [Environment Configuration](#environment-configuration)
-7. [Security Considerations](#security-considerations)
-8. [Troubleshooting](#troubleshooting)
-9. [Maintenance](#maintenance)
+4. [Manual Setup](#manual-setup)
+5. [Environment Configuration](#environment-configuration)
+6. [Security Considerations](#security-considerations)
+7. [Troubleshooting](#troubleshooting)
+8. [Maintenance](#maintenance)
 
 ---
 
 ## 🚀 Quick Start Guide
 
-### Option 1: Docker Deployment (Recommended)
-```bash
-# Clone the repository
-git clone <repository-url>
-cd phishnet
-
-# Run Docker setup script
-chmod +x scripts/docker-setup.sh
-./scripts/docker-setup.sh
-```
-
-### Option 2: Manual Setup
+### Option 1: Manual Setup
 ```bash
 # Run setup script
 chmod +x scripts/setup.sh
@@ -51,21 +39,15 @@ chmod +x scripts/setup.sh
 
 ## 🔧 Deployment Options
 
-### 1. Docker Deployment (Production Ready)
-- **Best for:** Production environments, easy scaling
-- **Requirements:** Docker, Docker Compose
-- **Setup time:** 5-10 minutes
-- **Features:** Full isolation, reverse proxy, SSL ready
-
-### 2. Manual Installation
+### 1. Manual Installation
 - **Best for:** Development, custom configurations
 - **Requirements:** Node.js 18+, PostgreSQL 15+
 - **Setup time:** 10-15 minutes
 - **Features:** Full control, custom database settings
 
-### 3. Development Setup
+### 2. Development Setup
 - **Best for:** Local development, testing
-- **Requirements:** Node.js, PostgreSQL (local or Docker)
+- **Requirements:** Node.js, PostgreSQL
 - **Setup time:** 5-10 minutes
 - **Features:** Hot reload, development tools
 
@@ -84,117 +66,7 @@ The project includes comprehensive database setup files:
 -- landing_pages, notifications, sessions, and more
 ```
 
-**Key Features:**
-- Multi-tenant organization structure
-- User role management (admin, manager, user)
-- Campaign and email template management
-- Landing page hosting system
-- Comprehensive notification system
-- Session management with Redis support
-- Audit logging and tracking
-
-#### 2. Sample Data (`migrations/01_sample_data.sql`)
-```sql
--- Sample organizations, users, and templates
--- Ready-to-use phishing simulation data
-```
-
-**Includes:**
-- 3 sample organizations (Corporate, Education, Healthcare)
-- 7 user accounts with different roles
-- 4 professional email templates
-- 2 landing page templates
-- Administrative accounts
-
-### Database Connection Options
-
-#### PostgreSQL (Production)
-```bash
-# Local PostgreSQL
-DATABASE_URL="postgresql://username:password@localhost:5432/phishnet"
-
-# Docker PostgreSQL
-DATABASE_URL="postgresql://phishnet_user:password@localhost:5432/phishnet"
-
-# Remote PostgreSQL
-DATABASE_URL="postgresql://user:pass@hostname:5432/phishnet"
-```
-
-#### SQLite (Development)
-```bash
-# Local SQLite file
-DATABASE_URL="sqlite:./database.sqlite"
-```
-
----
-
-## 🐳 Docker Deployment
-
-### Prerequisites
-- Docker 20.10+
-- Docker Compose 2.0+
-- 4GB RAM minimum
-- 10GB disk space
-
-### Quick Docker Setup
-
-1. **Clone and prepare:**
-```bash
-git clone <repository-url>
-cd phishnet
-```
-
-2. **Run setup script:**
-```bash
-chmod +x scripts/docker-setup.sh
-./scripts/docker-setup.sh
-```
-
-3. **Or manual Docker setup:**
-```bash
-# Copy environment file
-cp .env.docker .env
-
-# Build and start services
-docker-compose up -d
-
-# Check status
-docker-compose ps
-```
-
-### Docker Services
-
-| Service | Port | Description |
-|---------|------|-------------|
-| **app** | 3001 | PhishNet Application |
-| **database** | 5432 | PostgreSQL Database |
-| **redis** | 6379 | Redis Cache/Sessions |
-| **nginx** | 80, 443 | Reverse Proxy |
-
-### Docker Management Commands
-
-```bash
-# Start services
-docker-compose up -d
-
-# Stop services
-docker-compose down
-
-# View logs
-docker-compose logs -f app
-
-# Restart specific service
-docker-compose restart app
-
-# Update application
-docker-compose pull && docker-compose up -d
-
-# Backup database
-docker-compose exec database pg_dump -U phishnet_user phishnet > backup.sql
-
-# Restore database
-docker-compose exec -T database psql -U phishnet_user phishnet < backup.sql
-```
+<!-- Historical note: Container-based deployment removed Aug 2025. All instructions now assume native host services. -->
 
 ---
 
@@ -407,14 +279,7 @@ sudo certbot certonly --webroot -w /var/www/html -d yourdomain.com
 # Place cert.pem and key.pem in ssl directory
 ```
 
-2. **Update Docker Compose:**
-```yaml
-nginx:
-  volumes:
-    - ./ssl:/etc/nginx/ssl
-  ports:
-    - "443:443"
-```
+<!-- legacy compose SSL mapping removed -->
 
 3. **Update Nginx Configuration:**
 ```nginx
@@ -461,28 +326,14 @@ chmod 755 uploads/
 chmod +x scripts/*.sh
 ```
 
-#### Docker Issues
-```bash
-# Check Docker daemon
-sudo systemctl status docker
-
-# View container logs
-docker-compose logs app
-
-# Restart containers
-docker-compose restart
-
-# Clean up containers
-docker-compose down --volumes
-docker system prune -a
-```
+<!-- legacy troubleshooting section removed -->
 
 ### Log Locations
 
 - **Application logs:** `logs/phishnet.log`
 - **Nginx logs:** `/var/log/nginx/`
 - **PostgreSQL logs:** `/var/log/postgresql/`
-- **Docker logs:** `docker-compose logs`
+<!-- legacy logs reference removed -->
 
 ---
 
@@ -512,8 +363,7 @@ docker system prune -a
 # PostgreSQL backup
 pg_dump -h localhost -U phishnet_user phishnet > backup_$(date +%Y%m%d).sql
 
-# Docker database backup
-docker-compose exec database pg_dump -U phishnet_user phishnet > backup.sql
+<!-- legacy database backup example removed -->
 ```
 
 #### File Backup
@@ -561,8 +411,6 @@ npm update
 npm run build
 
 # Restart services
-docker-compose restart app
-# or
 sudo systemctl restart phishnet
 ```
 

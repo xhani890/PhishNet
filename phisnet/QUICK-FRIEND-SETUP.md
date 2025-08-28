@@ -41,13 +41,7 @@
    ./setup-from-package.sh
    ```
 
-### Method 3: Docker (If you have Docker Desktop)
-
-1. **Extract the package** and navigate to `phishnet/` folder
-2. **Run with Docker:**
-   ```bash
-   docker compose up -d
-   ```
+<!-- legacy container method removed -->
 
 ---
 
@@ -148,6 +142,6 @@ If you run into issues:
 | Deploy | `.\deploy.ps1` | `./deploy.sh` |
 | Start | `.\start.ps1` | `./start.sh` |
 | Test | `.\test-deployment.ps1` | `./deploy.sh --help` |
-| Docker | `docker compose up -d` | `docker compose up -d` |
+| (legacy) | (removed) | (removed) |
 
 **🎉 That's it! You should now have a fully working PhishNet installation with all the original data and settings.**

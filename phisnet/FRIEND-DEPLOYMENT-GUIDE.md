@@ -123,25 +123,6 @@ Restart-Service postgresql*
 
 ---
 
-## 📱 Alternative: Docker Deployment (Advanced)
-
-If your friend has Docker Desktop:
-
-#### Step 1: Install Docker Desktop
-Download from: https://www.docker.com/products/docker-desktop
-
-#### Step 2: Run with Docker
-```bash
-# Navigate to PhishNet directory
-cd PhishNet-Package-XXXXXX
-
-# Start with Docker
-docker compose up -d
-```
-
-#### Step 3: Access PhishNet
-Open http://localhost:3000 in browser
-
 ---
 
 ## 🎯 What Your Friend Gets
@@ -240,12 +221,6 @@ deploy.bat    # Deploy
 start.bat     # Start
 ```
 
-### Docker (If preferred)
-```bash
-docker compose up -d      # Start
-docker compose down       # Stop
-docker compose logs       # View logs
-```
 
 ---
 

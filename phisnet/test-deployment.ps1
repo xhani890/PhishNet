@@ -179,33 +179,7 @@ if (Test-Path ".env") {
     $failed++
 }
 
-# Test 7: Docker (optional)
-Write-Info "Test 7: Checking Docker (optional)..."
-try {
-    if (Get-Command docker -ErrorAction SilentlyContinue) {
-        $dockerVersion = docker --version 2>$null
-        if ($dockerVersion) {
-            try {
-                $dockerInfo = docker info 2>$null
-                if ($dockerInfo) {
-                    Write-Success "Docker available and running"
-                } else {
-                    Write-Warning "Docker installed but not running"
-                }
-            } catch {
-                Write-Warning "Docker installed but status unknown"
-            }
-        } else {
-            Write-Warning "Docker command found but not working"
-        }
-    } else {
-        Write-Info "Docker not installed (optional)"
-    }
-    $passed++  # Docker is optional
-} catch {
-    Write-Info "Docker check skipped"
-    $passed++
-}
+# (Former container test removed)
 
 # Test 8: Port availability
 Write-Info "Test 8: Checking port availability..."

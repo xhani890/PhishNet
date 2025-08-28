@@ -282,57 +282,7 @@ npx drizzle-kit studio
 # Access at: http://localhost:4983
 ```
 
-## 🐳 Docker Setup (Alternative)
 
-### Using Docker Compose
-```yaml
-# docker-compose.yml
-version: '3.8'
-
-services:
-  postgres:
-    image: postgres:15
-    environment:
-      POSTGRES_DB: phishnet
-      POSTGRES_USER: phishnet_user
-      POSTGRES_PASSWORD: your_secure_password
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-
-  app:
-    build: .
-    ports:
-      - "3001:3001"
-      - "5173:5173"
-    environment:
-      - NODE_ENV=development
-      - DATABASE_URL=postgresql://phishnet_user:your_secure_password@postgres:5432/phishnet
-    depends_on:
-      - postgres
-    volumes:
-      - .:/app
-      - /app/node_modules
-
-volumes:
-  postgres_data:
-```
-
-### Docker Commands
-```bash
-# Build and start containers
-docker-compose up -d
-
-# Stop containers
-docker-compose down
-
-# View logs
-docker-compose logs -f
-
-# Rebuild containers
-docker-compose up --build
-```
 
 ## 🚨 Troubleshooting
 
