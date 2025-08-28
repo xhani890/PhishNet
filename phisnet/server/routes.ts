@@ -49,6 +49,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       role_id INTEGER REFERENCES roles(id) ON DELETE CASCADE,
       created_at TIMESTAMP DEFAULT NOW()
     );`);
+    // Ensure default roles seeded
+    await db.execute(sql`INSERT INTO roles (name, description, permissions)
+      SELECT 'Admin', 'Full system access and user management', '["all"]'::jsonb
+      WHERE NOT EXISTS (SELECT 1 FROM roles WHERE name='Admin');`);
+    await db.execute(sql`INSERT INTO roles (name, description, permissions)
+      SELECT 'Manager', 'Campaign management and reporting', '["campaigns","reports","users:read"]'::jsonb
+      WHERE NOT EXISTS (SELECT 1 FROM roles WHERE name='Manager');`);
+    await db.execute(sql`INSERT INTO roles (name, description, permissions)
+      SELECT 'User', 'Basic user access', '["campaigns:read","reports:read"]'::jsonb
+      WHERE NOT EXISTS (SELECT 1 FROM roles WHERE name='User');`);
+    // Assign Admin role to any qualifying admin-style user lacking it
+    await db.execute(sql`INSERT INTO user_roles (user_id, role_id)
+      SELECT u.id, r.id
+      FROM users u
+      JOIN roles r ON r.name='Admin'
+      LEFT JOIN user_roles ur ON ur.user_id = u.id AND ur.role_id = r.id
+      WHERE (u.is_admin = true OR lower(u.email) = 'admin@phishnet.com')
+        AND ur.id IS NULL;`);
   } catch (e) {
     console.error('Auto-migration (roles tables) failed:', e);
   }
@@ -1438,7 +1456,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
               await db.insert(rolesSchema).values({
                 name: r.name,
                 description: r.description,
-                permissions: { permissions: r.permissions }
+                // store permissions as raw array (schema default now array JSON)
+                permissions: Array.isArray((r as any).permissions) ? (r as any).permissions : (r as any).permissions?.permissions || []
               } as any);
             } catch {}
           }
@@ -1474,7 +1493,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .innerJoin(rolesSchema, eq(userRolesSchema.roleId, rolesSchema.id))
           .where(eq(userRolesSchema.userId, user.id));
 
-          if (userRoles.length === 0 && user.isAdmin) {
+          if (userRoles.length === 0 && (user.isAdmin || user.email.toLowerCase() === 'admin@phishnet.com')) {
             // Auto-assign Admin role if missing
             const [adminRole] = await db.select({ id: rolesSchema.id, name: rolesSchema.name, description: rolesSchema.description, permissions: rolesSchema.permissions })
               .from(rolesSchema)
@@ -1874,7 +1893,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             await db.insert(rolesSchema).values({
               name: r.name,
               description: r.description,
-              permissions: { permissions: r.permissions }
+              permissions: Array.isArray((r as any).permissions) ? (r as any).permissions : (r as any).permissions?.permissions || []
             } as any);
           } catch (e) {
             // Ignore duplicates

@@ -1,3 +1,4 @@
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- useState used for customTypes state below
 import { useState, useRef, useEffect } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
@@ -15,8 +16,8 @@ import {
   Send, 
   ArrowLeft,
   Save,
-  X
-} from "lucide-react";
+  Plus
+} from "lucide-react"; // Plus used for add custom type button
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 // @ts-ignore
@@ -25,6 +26,7 @@ import 'suneditor/dist/css/suneditor.min.css';
 // Import custom CSS to override SunEditor styles
 import "@/styles/suneditor-dark.css";
 
+// Validation: allow html_content to start empty (blank editor for new template) and enforce on submit manually
 const templateSchema = z.object({
   name: z.string().min(1, "Template name is required"),
   type: z.string().min(1, "Template type is required"),
@@ -33,20 +35,46 @@ const templateSchema = z.object({
   subject: z.string().min(1, "Subject line is required"),
   sender_name: z.string().min(1, "Sender name is required"),
   sender_email: z.string().email("Invalid email format").min(1, "Sender email is required"),
-  html_content: z.string().min(1, "Email content is required"),
+  html_content: z.string().optional(),
 });
 
 type TemplateFormValues = z.infer<typeof templateSchema>;
 
 interface TemplateEditorProps {
-  template?: any;
-  onClose: () => void;
+  readonly template?: any;
+  readonly onClose: () => void;
 }
 
-export default function TemplateEditor({ template, onClose }: TemplateEditorProps) {
+// Props already readonly via interface; disable redundant lint rule
+// eslint-disable-next-line react/require-optional-chain -- not needed
+const TemplateEditor: React.FC<TemplateEditorProps> = ({ template, onClose }) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const sunEditorRef = useRef<any>(null);
+  const [customTypes, setCustomTypes] = useState<string[]>(() => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const saved = localStorage.getItem('custom_template_types');
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
+  const addCustomType = () => {
+    const newType = window.prompt('Enter new template type (slug or words):');
+    if (!newType) return;
+    const trimmed = newType.trim().toLowerCase().replace(/\s+/g,'-');
+    if (!trimmed) return;
+    const exists = ["phishing-home","phishing-business","phishing-financial","phishing-social", ...customTypes].includes(trimmed);
+    if (exists) {
+      toast({ title: 'Type exists', description: 'That type already exists.' });
+      form.setValue('type', trimmed);
+      return;
+    }
+    const updated = [...customTypes, trimmed];
+    setCustomTypes(updated);
+    try { localStorage.setItem('custom_template_types', JSON.stringify(updated)); } catch {}
+    form.setValue('type', trimmed);
+    toast({ title: 'Type added', description: `Custom type '${trimmed}' added.` });
+  };
 
   // Map template data properly to form values
   const isEditing = !!template;
@@ -74,17 +102,19 @@ export default function TemplateEditor({ template, onClose }: TemplateEditorProp
       subject: "",
       sender_name: "PhishNet Team",
       sender_email: "phishing@example.com",
-      html_content: "<div style=\"font-family: Arial, sans-serif;\">\n  <h2 style=\"color: #333;\">Your Email Title</h2>\n  <p style=\"color: #666;\">Dear {{.FirstName}},</p>\n  <p style=\"color: #666;\">Your email content here...</p>\n  <p style=\"margin: 20px 0; text-align: center;\">\n    <a href=\"{{.TrackingURL}}\" style=\"background-color: #0070e0; color: white; padding: 10px 20px; text-decoration: none; border-radius: 4px; display: inline-block;\">Click Here</a>\n  </p>\n  <p style=\"color: #666; margin-top: 20px;\">Thank you,<br>{{.SenderName}}</p>\n</div>",
+      html_content: "", // start blank
     },
   });
 
-  // Effect to update editor content when template changes
+  // Effect to set editor content when editing or clear when creating
   useEffect(() => {
-    if (isEditing && sunEditorRef.current && template?.html_content) {
-      console.log("Setting editor content from template");
-      setTimeout(() => {
-        sunEditorRef.current.setContents(template.html_content);
-      }, 100);
+    if (sunEditorRef.current) {
+      if (isEditing && template?.html_content) {
+        setTimeout(() => sunEditorRef.current?.setContents(template.html_content), 50);
+      } else if (!isEditing) {
+        // clear editor for fresh create
+        setTimeout(() => sunEditorRef.current?.setContents(""), 10);
+      }
     }
   }, [isEditing, template]);
 
@@ -108,13 +138,10 @@ export default function TemplateEditor({ template, onClose }: TemplateEditorProp
 
   const getSunEditorInstance = (sunEditor: any) => {
     sunEditorRef.current = sunEditor;
-    
-    // Initialize with content if editing
     if (isEditing && template?.html_content) {
-      console.log("Setting initial editor content");
-      setTimeout(() => {
-        sunEditor.setContents(template.html_content);
-      }, 100);
+      setTimeout(() => sunEditor.setContents(template.html_content), 50);
+    } else {
+      setTimeout(() => sunEditor.setContents(""), 10);
     }
   };
 
@@ -201,11 +228,14 @@ export default function TemplateEditor({ template, onClose }: TemplateEditorProp
   };
 
   function onSubmit(data: TemplateFormValues) {
-    // Make sure we get the latest editor content
     if (sunEditorRef.current) {
       data.html_content = sunEditorRef.current.getContents();
     }
-    mutation.mutate(data);
+    if (!data.html_content || data.html_content.trim().length === 0 || /^(<p><br><\/p>)*$/i.test(data.html_content.trim())) {
+      toast({ title: "Content required", description: "Please add email body content before saving.", variant: "destructive" });
+      return;
+    }
+    mutation.mutate(data as any);
   }
 
   // Apply dark theme styles to SunEditor
@@ -242,23 +272,33 @@ export default function TemplateEditor({ template, onClose }: TemplateEditorProp
                 name="type"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Type *</FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      defaultValue={field.value}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select a type" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="phishing-home">Phishing - Home & Personal</SelectItem>
-                        <SelectItem value="phishing-business">Phishing - Business</SelectItem>
-                        <SelectItem value="phishing-financial">Phishing - Financial</SelectItem>
-                        <SelectItem value="phishing-social">Phishing - Social Media</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <FormLabel className="flex items-center justify-between">Type *
+                      <Button type="button" variant="ghost" size="sm" className="h-6 px-1" onClick={addCustomType} title="Add custom type">
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </FormLabel>
+                    <div className="flex gap-2 items-center">
+                      <Select
+                        onValueChange={field.onChange}
+                        value={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select or add type" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="phishing-home">Phishing - Home & Personal</SelectItem>
+                          <SelectItem value="phishing-business">Phishing - Business</SelectItem>
+                          <SelectItem value="phishing-financial">Phishing - Financial</SelectItem>
+                          <SelectItem value="phishing-social">Phishing - Social Media</SelectItem>
+                          {customTypes.length > 0 && <div className="px-2 py-1 text-xs opacity-60">Custom</div>}
+                          {customTypes.map(ct => (
+                            <SelectItem key={ct} value={ct}>{ct}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -462,4 +502,6 @@ export default function TemplateEditor({ template, onClose }: TemplateEditorProp
       </Form>
     </div>
   );
-}
+};
+
+export default TemplateEditor;
