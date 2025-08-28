@@ -75,7 +75,6 @@ jobs:
         fi
         
     - name: Snyk security scan (optional if token present)
-      if: ${{ secrets.SNYK_TOKEN != '' }}
       uses: snyk/actions/node@master
       continue-on-error: true
       env:
