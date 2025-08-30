@@ -74,19 +74,41 @@ try {
     exit 1
 }
 
-# Check if database is accessible (optional check)
-Write-Info "Checking database connection..."
+function Test-BuildToolchain {
+    try {
+        $nodeVer = node --version 2>$null
+        if ($nodeVer) {
+            $major = [int]($nodeVer -replace 'v','' -split '\.' | Select-Object -First 1)
+            if ($major -gt 20) {
+                Write-Warning "Running on Node $nodeVer. Recommended Node 20 LTS for stable esbuild binary installs."
+            }
+        }
+    } catch {}
+    # Compare expected esbuild version from package.json with actual if present
+    try {
+        $pkg = Get-Content package.json -Raw | ConvertFrom-Json
+        $expected = $pkg.devDependencies.esbuild
+        if ($expected) {
+            $actual = (npx --no esbuild --version 2>$null)
+            if ($actual -and ($expected -ne $actual)) {
+                Write-Warning "esbuild version mismatch expected $expected got $actual – attempting reinstall"
+                npm install -D esbuild@$expected | Out-Null
+            }
+        }
+    } catch {}
+}
+
+Test-BuildToolchain
+
+# Lightweight database connectivity probe (non-fatal)
+Write-Info "Checking database connection (light)..."
 try {
-    npm run db:push >$null 2>&1
+    npm run db:push --silent >$null 2>&1
     if ($LASTEXITCODE -eq 0) {
         Write-Success "Database connection verified"
     } else {
-        Write-Warning "Database connection failed. PhishNet may not work properly."
-        Write-Info "Run '.\deploy.ps1' to set up the database"
-    }
-} catch {
-    Write-Warning "Could not verify database connection"
-}
+        Write-Warning "Database not reachable yet (continuing). Run .\\deploy.ps1 if first setup." }
+} catch { Write-Warning "Skipped DB connectivity check" }
 
 # Create required directories
 $directories = @("logs", "uploads", "temp")

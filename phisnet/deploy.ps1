@@ -536,7 +536,23 @@ function Setup-Application {
     # Install npm dependencies
     Write-Info "Installing npm dependencies..."
     try {
+        # Toolchain guard: warn on Node >20 and attempt esbuild alignment if install fails
+        $nodeVer = (node --version) 2>$null
+        if ($nodeVer -and $nodeVer -match 'v([0-9]+)') { $nMajor=[int]$Matches[1]; if ($nMajor -gt 20) { Write-Warning "Detected Node $nMajor. Recommended Node 20 LTS to avoid potential esbuild binary mismatch." } }
+
         npm install
+        if ($LASTEXITCODE -ne 0) {
+            Write-Warning "Initial npm install failed. Attempting esbuild version alignment and retry..."
+            try {
+                $pkgJson = Get-Content package.json -Raw | ConvertFrom-Json
+                $expectedEsbuild = $pkgJson.devDependencies.esbuild
+                if ($expectedEsbuild) {
+                    Write-Info "Ensuring esbuild@$expectedEsbuild is installed..."
+                    npm install esbuild@$expectedEsbuild --save-dev
+                }
+            } catch { Write-Warning "Could not parse package.json for esbuild version: $($_.Exception.Message)" }
+            npm install
+        }
         if ($LASTEXITCODE -eq 0) {
             Write-Success "npm dependencies installed"
         } else {

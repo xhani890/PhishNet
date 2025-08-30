@@ -460,12 +460,25 @@ mkdir -p logs uploads temp exports backups 2>/dev/null
 chmod 755 logs uploads temp exports backups 2>/dev/null
 success "Required directories created"
 
-# Install npm dependencies
+# Install npm dependencies with Node/esbuild compatibility guard
 info "🚀 Setting up PhishNet application..."
 
-#
+# Detect unsupported newer Node majors for some build tools
+NODE_MAJOR=$(node -v 2>/dev/null | sed -E 's/v([0-9]+).*/\1/' || echo 0)
+if [[ $NODE_MAJOR -gt 20 ]]; then
+    warning "Detected Node major $NODE_MAJOR. Recommended Node 20 LTS to avoid esbuild binary mismatch (see contributor error)."
+    warning "If install fails, install Node 20 (e.g. nvm install 20 && nvm use 20) then re-run deploy.sh"
+fi
 
-npm install
+# Attempt install with retry focusing on esbuild if mismatch occurs
+if ! npm install; then
+    warning "npm install failed – attempting esbuild version alignment and retry..."
+    EXPECTED_ESBUILD=$(node -p "(require('./package.json').devDependencies||{}).esbuild || ''" 2>/dev/null)
+    if [[ -n "$EXPECTED_ESBUILD" ]]; then
+        npm install -D esbuild@"$EXPECTED_ESBUILD" || true
+    fi
+    npm install || error "Final npm install attempt failed. Resolve manually (often due to Node version)."
+fi
 
 # Database schema and data setup
 info "🗄️ Setting up database schema..."
